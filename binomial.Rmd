@@ -1,0 +1,142 @@
+---
+title: "Binomial variables in LAPOP"
+author: "Craig Jolley"
+date: "September 28, 2015"
+output: html_document
+---
+
+Binomial variables are those that can take on two values: 0/1, yes/no, male/female, etc. A *lot* of the Americas Barometer variables are of this type.
+
+Here, we'll focus on one example: indicator `vic40` (Out of fear of being a crime victim, in the last 12 months have you lmited the places where you go shop?). This variable takes on the following values:
+
+- 1 = Yes
+- 2 = No
+- 888888 = Don't know
+- 988888 = No response
+
+Before going further, let's load the necessary libraries:
+
+```{r}
+library(ggplot2) # needed for plotting
+library(stringr) # also needed for plot
+```
+
+For now, focus on Honduras in 2014. Assuming that you've already downloaded all of the Americas Barometer data (look [here](https://github.com/ccjolley/LAPOP-SMA/blob/master/load_lapop.R) if you haven't), we can load it into an R data frame:
+
+```{r}
+lapop.2014.HND <- read.csv('2014-HND.csv')
+```
+
+The easiest thing to do is look at the average. We need to make sure that we only look at valid yes/no responses; our average will be meaningless otherwise. The easy way to do this is to create a copy of our data and remove the useless entries. If you want to do this with a different dataset, just replace `vic20` below with a different indicator.
+
+```{r}
+my_data <- lapop.2014.HND$vic40[lapop.2014.HND$vic40<3] # keep only entries with value < 3
+mean(my_data==1)
+```
+
+There are two things going on in that statement. `vic40==1` creates a string of TRUE/FALSE values, telling us whether the answer was equal to 1. Taking the mean of this tells us what fraction of people responded 'yes' -- about 34%.
+
+Averages can be misleading -- they didn't ask everyone, and so the real average might not be exactly 34%. We can see what the likely range of values is by using an exact binomial test:
+
+```{r}
+binom.test(sum(my_data==1),length(my_data))
+```
+
+This tells us that, out of 1558 people who answered the question, 531 said "yes", so the population average (what we would get if we really asked everybody) hasa 95% chance of being between 31.7% and 36.5%.
+
+Just for fun, we can see what would happen if the LAPOP team had only asked 100 people:
+
+```{r}
+binom.test(sum(head(my_data,100)==1),100)
+```
+
+If we only had the first 100 survey responses, we can only be confident that the population average is between 21.2% and 40%. Asking more people matters!
+
+Suppose we want to make a snazzy bar chart (because pie charts are so 2004). I'm making this chart using **ggplot**, which is a really powerful graphics package for R. The syntax can be sort of intimidating; what I do is to keep a "recipe collection" of plots that have looked nice in the past so that I can just make small changes as needed. If you change which indicator you're looking at, you might need to adjust things a little to keep it looking nice.
+
+```{r}
+f <- data.frame(my_data)
+names(f) <- 'ans'
+yes_text <- paste('Yes: ',round(mean(my_data==1)*100,digits=1),'%',sep='') # Label for 'yes' bar
+no_text <- paste('No: ',round(mean(my_data==2)*100,digits=1),'%',sep='') # Label for 'no' bar
+q_text <- 'Out of fear of being a crime victim, in the last 12 months have you limited the places where you go shop?'
+q_y <- max(sum(my_data==1),sum(my_data==2)) # How high up should the question text be?
+offset=length(my_data)*0.05 # Move labels down a bit from the top of bars
+ggplot(f,aes(factor(ans,labels=c('Yes','No')))) + 
+  geom_bar(fill='goldenrod') +
+  annotate('text',label=yes_text,      # add 'yes' label
+           size=8,x=1,y=sum(my_data==1)-offset,hjust=0.5,vjust=0) +
+  annotate('text',label=no_text,       # add 'no' label
+           size=8,x=2,y=sum(my_data==2)-offset,hjust=0.5,vjust=0) +
+  annotate('text',label=str_wrap(q_text,width=32),  # add question text
+           size=5,x=0.5,y=q_y,hjust=0,vjust=1) +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) 
+```
+
+That's all nice, but there's probably more we can do with this indicator. For example, we can test for correlations with other binomial variables. For example, are men or women more likely to change their shopping patterns? We can do this using [Fisher's exact test](http://www.cookbook-r.com/Statistical_analysis/Frequency_tests/).
+
+We'll want to keep only the observations that have valid answers for both `vic40` and `sex`:
+
+```{r}
+my_data2 <- lapop.2014.HND[,c('vic40','sex')]
+my_data2 <- my_data2[my_data2$vic40<3 & my_data2$sex<3,]
+```
+
+Now let's put them in a contingency table, and run a Fisher test:
+
+```{r}
+ct <- table(my_data2$vic40,my_data2$sex)
+fisher.test(ct)
+```
+
+Our odds ratio is very close to 1, and our p value is > 0.05, so it's likely that there's no real difference in how men and women change their shopping behavior in response to fear of crime. 
+
+We could also see if being a victim of crime makes people more likely to change their shopping habits out of fear, by looking at the `vic1ext` indicator:
+
+```{r}
+my_data3 <- lapop.2014.HND[,c('vic40','vic1ext')]
+my_data3 <- my_data3[my_data3$vic40<3 & my_data3$vic1ext<3,]
+ct <- table(my_data3$vic40,my_data3$vic1ext)
+fisher.test(ct)
+```
+
+Now we have an odds ratio close to 3 -- being a victim of crime makes people about 3x as likely to change their shopping habits. Our very low p-value means that this is probably a significant correlation. If you want something more visual, you could try this:
+
+```{r}
+plotme <- my_data3
+plotme[plotme==2] <- 1.5
+ggplot(plotme,aes(x=vic1ext,y=vic40)) + 
+  geom_jitter(color='darkgreen',size=5, alpha=0.2, position = position_jitter(w = 0.2, h = 0.2)) + 
+  annotate('text',label='Changed shopping',    
+           size=7,x=1,y=1.8,hjust=0.5,vjust=0) +
+  annotate('text',label="Didn't change",    
+           size=7,x=1.5,y=1.8,hjust=0.5,vjust=0) +
+  annotate('text',label="Crime victim",    
+           size=7,x=0.75,y=1,hjust=1,vjust=0) +
+  annotate('text',label="Non-victim",    
+           size=7,x=0.75,y=1.5,hjust=1,vjust=0) +
+  scale_x_continuous(limits=c(0.5,1.7)) +
+  theme_classic() +
+  theme(line=element_blank(),
+        title=element_blank(),
+        text=element_blank())
+```
+
+Now it's really obvious that most non-victims haven't changed their shopping habits, while a larger
+fraction of victims have changed theirs.
+
+**TODO:** Figure out how to make maps in R!
+
+
+
+
+
+
+
+
+
