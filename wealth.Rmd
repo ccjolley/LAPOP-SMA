@@ -165,7 +165,7 @@ As another sanity check, let's look at the distribution of values from our compo
 predict_data <- data.frame(r3=c(0,1),r4=c(0,1),r4a=c(0,1),r5=c(0,3),r6=c(0,1),
                            r7=c(0,1),r8=c(0,1),r12=c(0,1),r14=c(0,1),
                            r15=c(0,1),r18=c(0,1),r1=c(0,1),r16=c(0,1),
-                           r26=c(0,1),inf3a=c(1,2),q10new=c(0,16),q10g=c(0,16))
+                           r26=c(0,1),inf3a=c(2,1),q10new=c(0,16),q10g=c(0,16))
 minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
 minmax <- (mean(all_pc1$avg) - minmax) / sd(all_pc1$avg)
 wealth <- data.frame(w=all_pc1$norm) 
@@ -196,7 +196,7 @@ To understand our index better, we can ask how different types of responses cont
 ```{r,warning=FALSE}
 predict_data2 <- data.frame(diag(17))
 names(predict_data2) <- names(predict_data)
-predict_data2$inf3a <- predict_data2$inf3a + 1
+predict_data2$inf3a <- 2-predict_data2$inf3a 
 scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
 scores <- (mean(all_pc1$avg) - scores) / sd(all_pc1$avg)
 diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
@@ -220,7 +220,7 @@ ggplot(diff_q,aes(x=n,y=d)) +
         axis.title.x=element_blank())
 ```
 
-Clearly, the indicators that measure income directly have a much larger influence on our wealth index than the others. Each 1-point increase in household income (`q10new`) increases the wealth index by 0.14, while the increases based on possessions are all much smaller. Having a microwave oven (`r7`) increases a person's wealth index more than having a cell phone (`r4a`). Even poor people have cell phones, while microwaves tend to show a large difference between rich and poor households. Note that the influence of inf3a (connection to a public water supply) is negative; this is because for this question 1=Yes and 2=No.
+Clearly, the indicators that measure income directly have a much larger influence on our wealth index than the others. Each 1-point increase in household income (`q10new`) increases the wealth index by 0.14, while the increases based on possessions are all much smaller. Having a microwave oven (`r7`) increases a person's wealth index more than having a cell phone (`r4a`). Even poor people have cell phones, while microwaves tend to show a large difference between rich and poor households. 
 
 How do we know whether this is really a good composite index? We've seen a few good signs already -- it captures most of the variance in the underlying indicators, it's robust to random variations in multiple imputation, and it's fairly nicely-distributed. The other thing to look for is how well it does at predicting the values of the individual variables -- a good wealth index should do a reasonable job of predicting how much income someone has and which things they own.
 
