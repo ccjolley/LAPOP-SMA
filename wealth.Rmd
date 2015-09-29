@@ -1,0 +1,277 @@
+---
+title: "Wealth index"
+author: "Craig Jolley"
+date: "September 29, 2015"
+output: html_document
+---
+
+Here I'll be demonstrating how to use principal component analysis to build a composite wealth index from Americas Barometer indicators. We'll be looking at the following:
+
+- `r3`: Refrigerator in home (0 = No, 1 = Yes)
+- `r4`: Landline in home
+- `r4a`: Cell phone in home
+- `r5`: Number of vehicles owned (0 = None, 1 = one, 2 = two, 3 = three or more)
+- `r6`: Washing machine in home
+- `r7`: Microwave oven in home
+- `r8`: Owns motorcycle
+- `r12`: Drinking water in home
+- `r14`: Indoor bathroom in home
+- `r15`: Computer in home
+- `r18`: Internet access in home
+- `r1`: Television in home
+- `r16`: Flat-panel TV in home
+- `r26`: Home connected to sewage system
+- `inf3a`: Connected to public water supply (1=yes, 2=no)
+- `q10new`: Monthly household income (scale of 0-16)
+- `q10g`: Monthly personal income (scale of 0-16)
+
+To start off, we'll load the necessary packages:
+
+```{r, message=FALSE}
+library(ggplot2)
+#install.packages("mice") # if you don't have it already
+library(mice)
+library(plyr) # nice for re-formatting data
+#install.packages("GGally") # if you don't have it already
+library(GGally) # for plot matrices
+```
+
+We'll load the 2014 Honduras data set, and construct a data frame containing the columns we want.
+
+```{r}
+lapop.2014.HND <- read.csv('2014-HND.csv')
+my_data <- lapop.2014.HND[,c('r3','r4','r4a','r5','r6','r7','r8','r12','r14',
+                             'r15','r18','r1','r16','r26','inf3a','q10new','q10g')]
+```
+
+We need to do something with missing values. It will be easier to work with them if we change them to NAs:
+
+```{r}
+is.na(my_data[my_data>16]) <- TRUE
+nrow(na.omit(my_data))
+```
+
+If we just ignore any rows with missing values, we'll end up with only 647 rows left -- 41% of what we started with. That sucks. How many values are we missing, anyway?
+
+```{r}
+sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
+```
+
+So we're only missing about 4% of values -- it hurts my heart to throw away 59% of the data because of that. It also might introduce biases (for example if poor or rich people are more likely to not answer questions). For now, though, I'll endure the pain and see what PCA looks like with just the complete data:
+
+```{r}
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+plot(pr_complete)
+summary(pr_complete)
+```
+
+83% of the variance is in the first component, which is pretty good. Note that people typically recommend using `scale=TRUE`; the reason I didn't is because one of our variables (`r1`, TV in home) has a variance of zero in this dataset -- everyone counted said "yes". This gives us a divide-by-zero error when we scale, which is no good. 
+
+Now let's try imputing those missing values. We can look at a scatterplot of the first two principal components:
+
+```{r,warning=FALSE}
+qplot(pr_complete$x[,1],pr_complete$x[,2],xlim=c(-10,10),ylim=c(-10,10))
+```
+
+These are the two principal components along which the variation is the most spread-out. The lattice-like pattern comes from the fact that we're seeing a projection of variables that can only take on certain discrete values, as opposed to continuous ones. In the ideal case, most of the variance would be in the first component, but this isn't too bad. If you want to see how some of the other dimenisions look, try changing the values 1 and 2 to others, up to 17 (which should contain the least variance).
+
+Now let's try imputing those missing values.
+
+There are a few different multiple imputation schemes available in R, but it's hard to find a good explanation of them. [This one](http://pj.freefaculty.org/guides/Rcourse/multipleImputation/multipleImputation-1-lecture.pdf) is OK, for being a really long powerpoint. I'll try doing this using the `mice` package (Multivariate Imputation by Chained Equations) and see how it does. More about MICE [here](http://www.stefvanbuuren.nl/mi/MICE.html).
+
+```{r}
+my_imp <- mice(my_data,printFlag = F) 
+my_imp
+```
+
+There's a lot going on in the output here. MICE generated 5 different imputed data sets, so that we can run the same analyses on each and see how they compare. Some columns have a lot more missing cells than others -- everybody knows whether they have a washing machine (`r6`), but flat-panel TVs (`r16`) caused some confusion, and a lot of people didn't disclose their personal income (`q10g`). The PredictorMatrix at the bottom shows which variables were used to predict others. Except for `r6` and `r15`, which didn't need predicting at all, it looks like everything was used to predict everything else. 
+
+Here's an example from one row that had some missing values (`r1`, `r16`, and `q10g`):
+
+```{r}
+my_data[4,]
+t(sapply(1:5,function(i) complete(my_imp,i)[4,]))
+```
+
+This family has a lot of stuff and a high income, so it predicted that `r1` and `r16` would be 1 -- they probably have a flat-panel TV also. The personal income (`q10g`) varies between imputed datasets, but tends to be at the high end.
+
+Now let's do the PCA calculation. We'll generate a structure called `pr` that
+contains the results of 5 different PCA calculations for the 5 imputed datasets.
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+```
+
+We can visualize the fraction of variance contained in each of the 17 principal components to see to what extent variance is concentrated in the first few. (Do this for just the first imputed model.)
+
+```{r}
+plot(pr[[1]])
+summary(pr[[1]])
+```
+
+About 84% of the total variance is concentrated in the first component, roughly the same as before imputation -- this means our imputation didn't mess things up too much (not yet, at least). What if we make a scatter plot of the first two components (for just one of the imputed datasets)?
+
+```{r}
+pc1 <- pr[[1]]$x[,1]
+pc2 <- pr[[1]]$x[,2]
+qplot(pc1,pc2,xlim=c(-15,10),ylim=c(-10,15))
+```
+
+We want to be sure that all five of our imputed datasets are measuring the same thing. We can do this by plotting all of the pairwise scatterplots; R makes this easy for us, if we put them all in one data frame first.
+
+```{r, fig.width=10, fig.height=10}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc1) + theme_classic()
+```
+
+What is this showing? `imp1` through `imp5` are our five imputed datasets, and we're looking at the first principal component from each. On the diagonal of this matrix, we see distribution plots for each of them -- they all look really similar. Above the diagonal, we get pairwise correlations; for example `imp1` and `imp2` have a correlation of 0.93. All of these are quite high. Below the diagonal, we see scatter plots for each pair of imputations. There are some disagreements, but in general they match up quite well. Averaging all five should help smooth out some of those cases where they disagree.
+
+```{r}
+all_pc1$avg <- rowMeans(all_pc1)
+quantile(all_pc1$avg)
+colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+```
+
+Here, we're looking at the average values of each indicator for the top and bottom 25% of our wealth index. Note that most of the numbers are higher for the bottom 25% than for the top 25% -- this means that our index is backwards, and wealthier people have a lower score. Let's fix that, and adjust the score to have a mean of 0 and standard deviation of 1 while we're at it. The new value will be in a column called `norm`.
+
+```{r}
+all_pc1$norm <- scale(-all_pc1$avg)
+colMeans(my_data[all_pc1$norm < quantile(all_pc1$norm)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc1$norm > quantile(all_pc1$norm)[4],],na.rm=TRUE)
+```
+
+Now our index is going in the right direction, and we can see how the top and bottom quantiles differ. For example, nearly everyone in the top 25% has a refrigerator (`r3`), a cell phone (`r4a`), indoor drinking water (`r12`), and a television (`r1`), but motorcycles (`r8`) are pretty rare. In the bottom 25%, more people have cell phones (`r4a`) than indoor bathrooms (`r14`).
+
+Let's see if the second principal component also contains any useful information:
+
+```{r,fig.height=10,fig.width=10}
+all_pc2 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,2]))
+names(all_pc2) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc2) + theme_classic()
+all_pc2$avg <- rowMeans(all_pc2)
+quantile(all_pc2$avg)
+colMeans(my_data[all_pc2$avg < quantile(all_pc2$avg)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc2$avg > quantile(all_pc2$avg)[4],],na.rm=TRUE)
+# TODO: It would be better to have a nice way of visualizing this, maybe using a slopeplot?
+```
+
+For the second principal component (PC2), the correlations between different imputed datasets are much lower. There aren't any big differences between average indicator values at the high and low ends of PC2. I'd interpret this to mean that PC2 isn't likely to be a very good composite index, because it isn't robust and it doesn't actually measure anything.
+
+As another sanity check, let's look at the distribution of values from our composite index. First, we'll figure out what the hypothetical maximum and minimum values of the wealth index are, then we'll plot those together with the actual density distribution.
+
+```{r}
+predict_data <- data.frame(r3=c(0,1),r4=c(0,1),r4a=c(0,1),r5=c(0,3),r6=c(0,1),
+                           r7=c(0,1),r8=c(0,1),r12=c(0,1),r14=c(0,1),
+                           r15=c(0,1),r18=c(0,1),r1=c(0,1),r16=c(0,1),
+                           r26=c(0,1),inf3a=c(1,2),q10new=c(0,16),q10g=c(0,16))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (mean(all_pc1$avg) - minmax) / sd(all_pc1$avg)
+wealth <- data.frame(w=all_pc1$norm) 
+ggplot(wealth,aes(x=w)) +
+  geom_density(fill='bisque2',linetype='blank') +
+  geom_segment(x=minmax[1],xend=minmax[1],y=0,yend=0.5,size=2,color='darkred') +
+  geom_segment(x=mean(wealth$w),xend=mean(wealth$w),y=0,yend=0.5,size=2,color='bisque4') +
+  geom_segment(x=minmax[2],xend=minmax[2],y=0,yend=0.5,size=2,color='darkolivegreen4') +
+  annotate('text',label=paste("Lowest:",round(minmax[1],2)),  
+           size=7,x=minmax[1]+0.05,y=0.4,hjust=0,vjust=0,color='darkred') +
+  annotate('text',label="Mean: 0",  
+           size=7,x=0.05,y=0.4,hjust=0,vjust=0,color='bisque4') +
+  annotate('text',label=paste("Highest:",round(minmax[2],2)),  
+           size=7,x=minmax[2]-0.05,y=0.4,hjust=1,vjust=0,color='darkolivegreen4') +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.line.y=element_blank()) 
+```
+
+Our data uses the full range of possible wealth values, and tends to be somewhat bunched up at the low end.
+
+To understand our index better, we can ask how different types of responses contribute to it. In other words, how much does it add to someone's wealth index if they have a TV, or a motorcycle, or if their income increases by one level on the 16-point scale?
+
+```{r,warning=FALSE}
+predict_data2 <- data.frame(diag(17))
+names(predict_data2) <- names(predict_data)
+predict_data2$inf3a <- predict_data2$inf3a + 1
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- (mean(all_pc1$avg) - scores) / sd(all_pc1$avg)
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+diff_r <- diff[!diff$n %in% c('q10new','q10g'),]
+diff_q <- diff[diff$n %in% c('q10new','q10g'),]
+ggplot(diff_r,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+```{r,fig.width=7,fig.height=2}
+ggplot(diff_q,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+Clearly, the indicators that measure income directly have a much larger influence on our wealth index than the others. Each 1-point increase in household income (`q10new`) increases the wealth index by 0.14, while the increases based on possessions are all much smaller. Having a microwave oven (`r7`) increases a person's wealth index more than having a cell phone (`r4a`). Even poor people have cell phones, while microwaves tend to show a large difference between rich and poor households. Note that the influence of inf3a (connection to a public water supply) is negative; this is because for this question 1=Yes and 2=No.
+
+How do we know whether this is really a good composite index? We've seen a few good signs already -- it captures most of the variance in the underlying indicators, it's robust to random variations in multiple imputation, and it's fairly nicely-distributed. The other thing to look for is how well it does at predicting the values of the individual variables -- a good wealth index should do a reasonable job of predicting how much income someone has and which things they own.
+
+First, let's look at income (`q10new`):
+
+```{r}
+q10new <- data.frame(q=my_data$q10new,w=wealth$w)
+q10new <- na.omit(q10new)
+my_lm <- lm(data=q10new, q ~ w)
+summary(my_lm)
+ggplot(q10new,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=14,hjust=0,vjust=0,color='royalblue') +
+  ylab('q10new') +
+  xlab('Wealth index') +
+  theme(text=element_text(size=20)) 
+
+```
+
+Now, what about microwave ownership (`r7`)?
+
+```{r}
+r7 <- data.frame(r=my_data$r7,w=wealth$w)
+r7 <- na.omit(r7)
+my_glm <- glm(data=r7, r ~ w, family=binomial(logit))
+summary(my_glm)
+ggplot(r7,aes(x=w,y=r)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2,position=position_jitter(0.1,0.1)) +
+  theme_classic() +
+  stat_smooth(method="glm", family="binomial",size=2,color='royalblue',se=FALSE) +
+  ylab('r7') +
+  xlab('Wealth index') +
+  theme(text=element_text(size=20),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) 
+
+```
+
+This fit isn't quite as pretty as `q10new` was, but the summary from the logistic regression calculation tells us that our wealth index has a highly-significant impact on microwave oven ownership. We can also see on the plot that the non-owners (`r7` = 0) are bunched up at the low-wealth end of the spectrum, as we'd expect. It should be easy to modify these plots for some of the other variables; you can see which ones are well-predicted by our wealth index and which ones might not be as much.
+
+```{r}
+log_data <- my_data[,c('r3','r4','r4a','r6','r7','r8','r12','r14','r15','r18','r1','r16','r26','inf3a')]
+log_data$inf3a  <- 2-log_data$inf3a
+p_vals <- sapply(log_data, function(x) coef(summary(glm(x ~ wealth$w,family=binomial(logit))))[2,4])
+p_vals
+```
+
+All of our p-values on logistic regressions are highly significant, meaning that our wealth index has a strong influence on all of these wealth-related variables. This is what we would expect! Notice that the smallest p-values (i.e. the highest significance) are for variables like `r7` and `r15` where the influence on the wealth index was higher. This is also what we would expect; variables like `r4a` and `inf3a` are still significant but not as strong.
+
+Now you know how to create a composite index based on a set of related variables, and you should have some ideas about how to test it thoroughly and make sure it is measuring what you want to measure. **What index do you want to create next?**
+
