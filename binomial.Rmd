@@ -7,7 +7,7 @@ output: html_document
 
 Binomial variables are those that can take on two values: 0/1, yes/no, male/female, etc. A *lot* of the Americas Barometer variables are of this type.
 
-Here, we'll focus on one example: indicator `vic40` (Out of fear of being a crime victim, in the last 12 months have you lmited the places where you go shop?). This variable takes on the following values:
+Here, we'll focus on one example: indicator `vic40` (Out of fear of being a crime victim, in the last 12 months have you limited the places where you go shop?). This variable takes on the following values:
 
 - 1 = Yes
 - 2 = No
@@ -16,9 +16,12 @@ Here, we'll focus on one example: indicator `vic40` (Out of fear of being a crim
 
 Before going further, let's load the necessary libraries:
 
-```{r}
+```{r message=FALSE}
 library(ggplot2) # needed for plotting
 library(stringr) # also needed for plot
+library(googleVis) # use this for interactive maps
+library(plyr)
+library(ISOcodes) # need this for department names
 ```
 
 For now, focus on Honduras in 2014. Assuming that you've already downloaded all of the Americas Barometer data (look [here](https://github.com/ccjolley/LAPOP-SMA/blob/master/load_lapop.R) if you haven't), we can load it into an R data frame:
@@ -27,7 +30,7 @@ For now, focus on Honduras in 2014. Assuming that you've already downloaded all 
 lapop.2014.HND <- read.csv('2014-HND.csv')
 ```
 
-The easiest thing to do is look at the average. We need to make sure that we only look at valid yes/no responses; our average will be meaningless otherwise. The easy way to do this is to create a copy of our data and remove the useless entries. If you want to do this with a different dataset, just replace `vic20` below with a different indicator.
+The easiest thing to do is look at the average. We need to make sure that we only look at valid yes/no responses; our average will be meaningless otherwise. The easy way to do this is to create a copy of our data and remove the useless entries. If you want to do this with a different dataset, just replace `vic40` below with a different indicator.
 
 ```{r}
 my_data <- lapop.2014.HND$vic40[lapop.2014.HND$vic40<3] # keep only entries with value < 3
@@ -42,7 +45,7 @@ Averages can be misleading -- they didn't ask everyone, and so the real average 
 binom.test(sum(my_data==1),length(my_data))
 ```
 
-This tells us that, out of 1558 people who answered the question, 531 said "yes", so the population average (what we would get if we really asked everybody) hasa 95% chance of being between 31.7% and 36.5%.
+This tells us that, out of 1558 people who answered the question, 531 said "yes", so the population average (what we would get if we really asked everybody) has a 95% chance of being between 31.7% and 36.5%.
 
 Just for fun, we can see what would happen if the LAPOP team had only asked 100 people:
 
@@ -127,16 +130,86 @@ ggplot(plotme,aes(x=vic1ext,y=vic40)) +
         text=element_blank())
 ```
 
-Now it's really obvious that most non-victims haven't changed their shopping habits, while a larger
-fraction of victims have changed theirs.
+Now it's really obvious that most non-victims haven't changed their shopping habits, while a larger fraction of victims have changed theirs.
 
-**TODO:** Figure out how to make maps in R!
+Where do the people who have made these changes live? I'm going to map this out using the Google Charts API, which looks like the easiest way to make interactive maps in R. For now, we'll map results by department, which are encoded in the `prov` indicator. These numeric values need to be translated into [ISO-3116-2 region codes](https://en.wikipedia.org/wiki/ISO_3166-2:HN#II-3).
 
+```{r}
+map_data <- lapop.2014.HND[,c('prov','vic40')]
+map_data <- map_data[map_data$vic40<3,] # need valid vic40 responses
+map_data$prov[map_data$prov==401] <- 'HN-FM' # Francisco Morazán
+map_data$prov[map_data$prov==402] <- 'HN-CM' # Comayagua
+map_data$prov[map_data$prov==403] <- 'HN-LP' # La Paz
+map_data$prov[map_data$prov==404] <- 'HN-CR' # Cortés
+map_data$prov[map_data$prov==405] <- 'HN-AT' # Atlántida
+map_data$prov[map_data$prov==406] <- 'HN-CL' # Colón
+map_data$prov[map_data$prov==407] <- 'HN-YO' # Yoro
+map_data$prov[map_data$prov==408] <- 'HN-IB' # Islas de la Bahía
+map_data$prov[map_data$prov==409] <- 'HN-CP' # Copán
+map_data$prov[map_data$prov==410] <- 'HN-IN' # Intibucá
+map_data$prov[map_data$prov==411] <- 'HN-LE' # Lempira
+map_data$prov[map_data$prov==412] <- 'HN-OC' # Ocotepeque
+map_data$prov[map_data$prov==413] <- 'HN-SB' # Santa Bárbara
+map_data$prov[map_data$prov==418] <- 'HN-EP' # El Paraíso
+map_data$prov[map_data$prov==419] <- 'HN-OL' # Olancho
+map_data$prov[map_data$prov==420] <- 'HN-GD' # Gracias a Dios
+map_data$prov[map_data$prov==421] <- 'HN-CH' # Choluteca
+map_data$prov[map_data$prov==422] <- 'HN-VA' # Valle
+map_data$vic40 <- 2 - map_data$vic40 # Now, 0=no, 1=yes
+map_avg <- ddply(map_data,~prov,summarize,x=mean(vic40))
+```
 
+Now, let's make our map:
 
+```{r,results='asis'}
+map_avg$vic40 <- round(map_avg$x,3)
+data("ISO_3166_2")
+ISO_3166_2_HN <- subset(ISO_3166_2, Country %in% "HN")
+ISO_3166_2_HN$prov <- ISO_3166_2_HN$Code # need matching names for join operation
+joined <- join(ISO_3166_2_HN,map_avg,by="prov")[c('Code','Name','vic40')]
+g <- gvisGeoChart(joined,locationvar='Code',colorvar='vic40',hovervar='Name',
+                  options=list(region="HN",resolution="provinces",
+                               colorAxis="{minValue: 0,  colors: ['#FFFFFF', '#2B65EC']}"))
+print(g,'chart')
+```
 
+So this is OK -- it tells us which departments showed the largest and smallest average values for `vic40`. Hover over the map with your mouse to see department names and average values. Another way of visualizing this that might be useful is to figure out which departments showed values of `vic40` that are significantly above-average (according to an exact Fisher test) and highlight those.
 
+```{r,results='asis'}
+vic40gt <- function(x) {
+  ct <- table(map_data$vic40,map_data$prov==x)
+  ft <- fisher.test(ct)
+  if (ft$p.value < 0.095 & ft$estimate > 1) {
+    return(1)
+  }
+  return(0)
+}
+is.gt <- data.frame(gt=sapply(unique(map_data$prov),vic40gt))
+is.gt$Code <- rownames(is.gt)
+joined <- merge(is.gt,joined,by='Code')
+g <- gvisGeoChart(joined,locationvar='Code',colorvar='gt',hovervar='Name',
+                  options=list(region="HN",resolution="provinces",
+                               colorAxis="{minValue: 0,  colors: ['#FFFFFF', '#C11B17']}"))
+print(g,'chart')
+```
 
+We can also look to see which departments have below-average values of `vic40`:
 
-
+```{r,results='asis'}
+vic40lt <- function(x) {
+  ct <- table(map_data$vic40,map_data$prov==x)
+  ft <- fisher.test(ct)
+  if (ft$p.value < 0.095 & ft$estimate < 1) {
+    return(1)
+  }
+  return(0)
+}
+is.lt <- data.frame(lt=sapply(unique(map_data$prov),vic40lt))
+is.lt$Code <- rownames(is.lt)
+joined <- merge(is.lt,joined,by='Code')
+g <- gvisGeoChart(joined,locationvar='Code',colorvar='lt',hovervar='Name',
+                  options=list(region="HN",resolution="provinces",
+                               colorAxis="{minValue: 0,  colors: ['#FFFFFF', '#3EA055']}"))
+print(g,'chart')
+```
 
