@@ -213,3 +213,57 @@ g <- gvisGeoChart(joined,locationvar='Code',colorvar='lt',hovervar='Name',
 print(g,'chart')
 ```
 
+So let's go back to the high-`vic40` areas. What's special about Cortes and Atlantida? Cortes contains San Pedro Sula, which is Honduras's 2nd-largest city, and Choloma, which is #3. The 4th-largest, La Ceiba, is in Atlantida. Is it possible that all we're seeing here is urbanization -- people in cities experience more crime and more shopping options, so they're more likely to change their shopping habits? First, let's see whether `vic40` correlates with the urbanization indicator, `ur` (1=urban, 2=rural).
+
+```{r}
+my_data4 <- lapop.2014.HND[,c('vic40','ur')]
+my_data4 <- my_data4[my_data4$vic40<3 & my_data4$ur<3,]
+ct <- table(my_data4$vic40,my_data4$ur)
+fisher.test(ct)         
+```
+
+So we can be at least 95% sure that there's a relationship between `vic40` and `ur`. So is there something special about Atlantida and Cortes, or is the urban/rural split the important factor?
+
+```{r}
+my_data5 <- lapop.2014.HND[,c('vic40','ur','prov')]
+my_data5$loc <- my_data5$prov == 404 | my_data5$prov == 405 # Atlantida or Cortes
+my_data5 <- my_data5[my_data5$vic40<3 & my_data5$ur<3,] # make sure vic40 and ur are valid
+my_data5$vic40 <- 2 - my_data5$vic40 # now 0 = no, 1 = yes
+urban <- subset(my_data5,ur==1)
+rural <- subset(my_data5,ur==2)
+ct_urban <- table(urban$vic40,urban$loc) 
+fisher.test(ct_urban)
+```
+
+So the city-dwellers of Atlantida and Cortes are more likely to change their shopping location than urban people in other parts of the country.
+
+```{r}
+ct_rural <- table(rural$vic40,rural$loc)
+fisher.test(ct_rural)
+```
+
+The same doesn't hold for their rural populations -- rural residents of Atlantida and Cortes are no more likely to change their shopping habits than rural people elsewhere.
+
+What if we turn this around? Are urban people in Atlantida and Cortes more likely to change their shopping habits than rural people in those departments?
+
+```{r}
+in_loc <- subset(my_data5,loc==1)
+ct_in <- table(in_loc$vic40,in_loc$ur)
+fisher.test(ct_in)
+```
+
+This relationship is statistically significant. Note that the odds ratio is less than 1: this is because `vic40` takes values of 0=no, 1=yes, while `ur` takes 1=urban, 2=rural. So an odds ratio less than 1 means that an increase in `vic40` will tend to a decrease in `ur`, and vice versa. Is this relationship also true outside Atlantida and Cortes?
+
+```{r}
+out_loc <- subset(my_data5,loc==0)
+ct_out <- table(out_loc$vic40,out_loc$ur)
+fisher.test(ct_out)
+```
+
+Yes it is, although the relationship is a little weaker outside Atlantida/Cortes than inside. So what have we learned here? If we take changing one's shopping habits as a proxy for fear of crime:
+
+- Urban people in Atlantida/Cortes are more afraid than urban people elsewhere
+- Rural people in Atlantida/Cortes aren't any more afraid than rural people elsewhere
+- Urban people are more afraid than rural people, both inside and outside Atlantida/Cortes
+
+In general, the urban/rural split is more important than whether people live in Atlantida/Cortes. However, the cities in those departments appear to be worse than the cities elsewhere in the country. We could follow up on this by repeating our analysis using `municipio` rather than `prov`, to see which municipalities have more fearful populations. I think this might be harder to map using googleVis, but the statistical analysis should be similar.
