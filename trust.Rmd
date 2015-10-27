@@ -1,0 +1,98 @@
+---
+title: "Trust_JP.rmd"
+author: "Jorge L. Perez"
+date: "26 October 2015"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+library(ggplot2)
+#install.packages("mice") # if you don't have it already
+library(mice)
+library(plyr) # nice for re-formatting data
+#install.packages("GGally") # if you don't have it already
+library(GGally) # for plot matrices
+
+my_data <- lapop.2014.HND[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13','b18','b21','b21a','b32', 'b37','b47a','b14','b15','b19','b46','honb51','venb11','venhonvb10','epp1','epp3','n9','n11','n15', 'b3milx')]
+
+is.na(my_data[my_data>16]) <- TRUE
+nrow(na.omit(my_data))
+
+sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
+
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+plot(pr_complete)
+summary(pr_complete)
+
+my_imp <- mice(my_data,printFlag = F) 
+my_imp
+
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+plot(pr[[1]])
+summary(pr[[1]])
+
+pc1 <- pr[[1]]$x[,1]
+pc2 <- pr[[1]]$x[,2]
+qplot(pc1,pc2)
+
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc1) + theme_classic()
+
+all_pc1$avg <- rowMeans(all_pc1)
+quantile(all_pc1$avg)
+colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+
+all_pc1$norm <- scale(all_pc1$avg)
+
+predict_data <- data.frame(b1=c(1,7),b2=c(1,7),b3=c(1,7),b4=c(1,7),
+                           b6=c(1,7),b10a=c(1,7),b11=c(1,7),b12=c(1,7),
+                           b13=c(1,7),b18=c(1,7),b21=c(1,7),b21a=c(1,7),
+                           b32=c(1,7),b37=c(1,7),b47a=c(1,7),b14=c(1,7),
+                           b15=c(1,7), b19=c(1,7), b46=c(1,7), honb51=c(1,7), venb11=c(1,7), venhonvb10=c(1,7), epp1=c(1,7), epp3=c(1,7), n9=c(1,7), n11=c(1,7), n15=c(1,7), b3milx=c(1,7))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (minmax-mean(all_pc1$avg)) / sd(all_pc1$avg)
+
+predict_data2 <- data.frame(diag(28)+1)
+names(predict_data2) <- names(my_data)
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg)
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+ggplot(diff,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+
+lmp <- function (modelobject) {
+    if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+    f <- summary(modelobject)$fstatistic
+    p <- pf(f[1],f[2],f[3],lower.tail=F)
+    attributes(p) <- NULL
+    return(p)
+}
+sapply(c('b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
+                             'b18','b21','b21a','b32', 'b37','b47a','b14','b15','b19','b46', 'honb51', 'venb11', 'venhonvb10', 'epp1', 'epp3', 'n9', 'n11', 'n15', 'b3milx'),
+       function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
+
+
+
+
+
+```{r}
+summary(cars)
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
