@@ -5,7 +5,7 @@ date: "October 6, 2015"
 output: html_document
 ---
 
-I'm interested in putting together an index to measure authoritarian attitudes. I think the following indicators are likely to be relevant:
+I'm interested in putting together an index to measure authoritarian attitudes. The following indicators are likely to be relevant:
 
 - `d1`: Approval of government critics' right to vote (1=low, 10=high)
 - `d2`: Approval of government critics' right to hold peaceful demonstrations
