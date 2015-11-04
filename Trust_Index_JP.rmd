@@ -1,0 +1,435 @@
+---
+title: "Trust_Index.rmd"
+author: "Jorge L. Perez"
+date: "31 October 2015"
+output: html_document
+---
+
+At the top of the document, please explain:
+- What you are trying to measure with this index
+- Which variables you are including and the range of values for each (i.e. "1=yes, 2=no" or "1=a lot, 5=not at all")
+- If you've explicitly chosen not to include some relevant-looking variables, what they are and why.
+
+You didn't originally have the `set.seed(12345)` command in there -- I didn't include it in the wealth index either, but it's a good idea. This specifies the starting point for the random number generator used in multiple imputation and ensures that the results of your analysis will be identical every time.
+
+```{r}
+library(ggplot2)
+#install.packages("mice") # if you don't have it already
+library(mice)
+library(plyr) # nice for re-formatting data
+#install.packages("GGally") # if you don't have it already
+library(GGally) # for plot matrices
+set.seed(12345) # makes imputation reproducible
+```
+
+
+```{r}
+lapop.2014.HND <- read.csv('../2014-HND.csv')
+my_data <- lapop.2014.HND[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13','b18','b21','b21a','b32', 'b37','b47a','b14','b15','b19','b46','honb51','venb11','venhonvb10','epp1','epp3','n9','n11','n15', 'b3milx')]
+```
+
+
+```{r}
+is.na(my_data[my_data>16]) <- TRUE
+nrow(na.omit(my_data))
+```
+
+```{r}
+sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
+```
+
+```{r}
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+plot(pr_complete)
+summary(pr_complete)
+```
+
+If we don't do any imputation, 39.6% of variance is contained in the first principal component; the others all appear to be much lower.
+
+```{r}
+my_imp <- mice(my_data,printFlag = F) 
+my_imp
+```
+
+None of the variables really stand out as needing a lot of imputation -- `b19` (Trust in the Superior Court of Accounts) is a little higher than others, possibly because some people don't know enough about it to know whether to trust it or not.
+
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+plot(pr[[1]])
+summary(pr[[1]])
+
+```
+
+After imputation, things don't change much -- 38.1% of variance is in the first PC.
+
+```{r}
+pc1 <- pr[[1]]$x[,1]
+pc2 <- pr[[1]]$x[,2]
+qplot(pc1,pc2)
+
+```
+
+First indication that things seem to be going well... (Extra points if you can say what about this plot makes me feel that way.)
+
+```{r}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc1) + theme_classic()
+
+```
+
+Beautiful distributions, high correlations (probably because not much imputation was required).
+
+```{r}
+all_pc1$avg <- rowMeans(all_pc1)
+quantile(all_pc1$avg)
+colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+```
+
+I see changes, some of them quite large, but without an explanation (at the top of the document, ideally) of which variables we're looking at, it's hard  to know what these changes mean and whether they make intuitive sense.
+
+Without interpreting changes, it's hard to know whether a high value of this index corresponds to high or low trust in government.
+
+```{r}
+all_pc1$norm <- scale(all_pc1$avg)
+```
+
+```{r}
+predict_data <- data.frame(b1=c(1,7),b2=c(1,7),b3=c(1,7),b4=c(1,7),
+                           b6=c(1,7),b10a=c(1,7),b11=c(1,7),b12=c(1,7),
+                           b13=c(1,7),b18=c(1,7),b21=c(1,7),b21a=c(1,7),
+                           b32=c(1,7),b37=c(1,7),b47a=c(1,7),b14=c(1,7),
+                           b15=c(1,7), b19=c(1,7), b46=c(1,7), honb51=c(1,7), venb11=c(1,7), venhonvb10=c(1,7), epp1=c(1,7), epp3=c(1,7), n9=c(1,7), n11=c(1,7), n15=c(1,7), b3milx=c(1,7))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (minmax-mean(all_pc1$avg)) / sd(all_pc1$avg)
+
+predict_data2 <- data.frame(diag(28)+1)
+names(predict_data2) <- names(my_data)
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg)
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+ggplot(diff,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+There are a few potential issues here:
+- The first value in `minmax` (ostensibly the minimum) is higher than the second (maximum). This could be an indication that `predict_data` wasn't set up correctly, or that high values of your index correspond to low trust, rather than high. The first row in `predict_data` should be the answers that a person with the minimum possible level of trust in government would have given; the second should be the answers showing a maximum level of trust.
+- If you look at `quantile(all_pc1$norm)`, you'll see that the minimum value is slightly higher than the lower value in `minmax`, and the maximum slightly lower than the higher value in `minmax`. This is good.
+- When you make the bar plot, you'll notice that all of the values are negative. This is because `predict_data2` is full of 1's and 2's -- that means you're starting with a baseline of no trust (1) and moving up to a tiny bit of trust (2). The resulting scores (stored in the variable `scores`) are all close to the maximum value of your index (which is stored in `minmax[1]`). Since you're subtracting the maximum from these perturbed scores (in line 110), everything comes out negative, which is sort of funny. It also tells us that higher values of the index mean less trust, which isn't very intuitive.
+
+I'd recommend replacing the code you have above with the following:
+
+```{r}
+all_pc1$norm <- -scale(all_pc1$avg) # reversed; now low scores mean low trust
+predict_data <- data.frame(b1=c(1,7),b2=c(1,7),b3=c(1,7),b4=c(1,7),
+                           b6=c(1,7),b10a=c(1,7),b11=c(1,7),b12=c(1,7),
+                           b13=c(1,7),b18=c(1,7),b21=c(1,7),b21a=c(1,7),
+                           b32=c(1,7),b37=c(1,7),b47a=c(1,7),b14=c(1,7),
+                           b15=c(1,7), b19=c(1,7), b46=c(1,7), honb51=c(1,7), 
+                           venb11=c(1,7), venhonvb10=c(1,7), epp1=c(1,7), 
+                           epp3=c(1,7), n9=c(1,7), n11=c(1,7), n15=c(1,7), 
+                           b3milx=c(1,7))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) # make sure to reverse here also
+
+predict_data2 <- data.frame(diag(28)+1)
+names(predict_data2) <- names(my_data)
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- -(scores-mean(all_pc1$avg)) / sd(all_pc1$avg) # make sure to reverse here as well
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+ggplot(diff,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+Now everything seems to be pointing the right direction.
+
+```{r}
+lmp <- function (modelobject) {
+    if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+    f <- summary(modelobject)$fstatistic
+    p <- pf(f[1],f[2],f[3],lower.tail=F)
+    attributes(p) <- NULL
+    return(p)
+}
+sapply(c('b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
+                             'b18','b21','b21a','b32', 'b37','b47a','b14','b15','b19','b46', 'honb51', 'venb11', 'venhonvb10', 'epp1', 'epp3', 'n9', 'n11', 'n15', 'b3milx'),
+       function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
+
+```
+
+Beautiful!
+
+```{r}
+
+b37 <- data.frame(q=my_data$b37,w=all_pc1$norm)
+b37 <- na.omit(b37)
+my_lm <- lm(data=b37, q ~ w)
+summary(my_lm)
+ggplot(b37,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
+  ylab('b37') +
+  xlab('Composite index') +
+  theme(text=element_text(size=20))
+
+```
+
+So... which variables did you omit here and why?
+`names(my_data)[!(names(my_data) %in% names(my_data2))]` tells me you left out b1, b2, b6, and b37 -- these had less influence than the others, but not by very much. I'd suggest leaving them in
+
+```{r}
+my_data2 <- lapop.2014.HND[,c('b3', 'b4','b10a','b11','b12','b13', 'b18','b21','b21a','b32', 'b47a','b14','b15','b19','b46', 'honb51', 'venb11', 'venhonvb10', 'epp1', 'epp3', 'n9', 'n11', 'n15', 'b3milx')]
+```
+
+```{r}
+is.na(my_data2[my_data2>16]) <- TRUE
+my_complete2 <- na.omit(my_data2)
+pr_complete2 <- prcomp(my_complete2,center=TRUE,scale=FALSE)
+plot(pr_complete2)
+summary(pr_complete2)
+```
+
+```{r}
+my_imp2 <- mice(my_data2,printFlag = F) 
+pr2 <- lapply(1:5,function(x) prcomp(complete(my_imp2,x),scale=FALSE,center=TRUE))
+plot(pr2[[1]]) 
+summary(pr2[[1]])
+
+```
+
+`critics_tol` is probably not a very good name for what you're doing here.
+
+```{r}
+critics_tol <- data.frame(llply(1:5, function(i) pr2[[i]]$x[,1]))
+names(critics_tol) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(critics_tol) + theme_classic()
+```
+
+```{r}
+critics_tol$avg <- rowMeans(critics_tol)
+critics_tol$norm <- scale(critics_tol$avg)
+colMeans(my_data2[critics_tol$norm < quantile(critics_tol$norm)[2],],na.rm=TRUE)
+colMeans(my_data2[critics_tol$norm > quantile(critics_tol$norm)[4],],na.rm=TRUE)
+```
+
+```{r}
+sapply(c('b3','b4','b10a','b11','b12','b13','b18','b21','b21a','b32','b47a','b14','b15','b19','b46', 'honb51', 'venb11', 'venhonvb10', 'epp1', 'epp3', 'n9', 'n11', 'n15', 'b3milx'),
+ function(x) lmp(lm(critics_tol$norm ~ my_data[,x])))
+
+```
+
+```{r}
+venhonvb10 <- data.frame(q=my_data$venhonvb10,w=critics_tol$norm)
+venhonvb10 <- na.omit(venhonvb10)
+my_lm <- lm(data=venhonvb10, q ~ w)
+summary(my_lm)
+ggplot(venhonvb10,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
+  ylab('venhonvb10') +
+  xlab('Composite index') +
+  theme(text=element_text(size=20))
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
