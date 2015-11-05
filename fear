@@ -1,0 +1,233 @@
+fear index
+calbano
+
+October 18, 2015
+```{r}
+lapop.2014.HND <- read.csv("~/Desktop/Honduras_Data_LAPOP_americasbarometer_2014.csv")
+```
+
+This time around, let’s go with the big list: - vic40: Out of fear of crime, has limited the places to go shopping 
+(1=yes, 2=no) - vic41: Out of fear of crime, has limited the places to go for recreation (1=yes, 2=no) - vic43: 
+Out of fear of crime, has felt the need to change neighborhoods (1=yes, 2=no) - vic44: Organized in Neighborhood for Security 
+(0 = no, 1=yes) - vic45: Out of fear of crime, has changed jobs (1=yes, 2=no) - fear10: Avoided Walking Through Dangerous Areas 
+(0=no, 1=yes) - fear6f: Insecurity at Schools (1 = a lot, 4 = not at all) - vic1ext: Victim of Crime (1=yes, 2=no) - vic1exta: 
+Victim of Crime (Frequency) (999999 if vic1ext=2, otherwise max=15) - vic1hogar: Other Victim of Crime in Household (1=yes, 2=no)
+aoj11: Perception of Neighborhood Security (1 = safe, 4 = unsafe) - pese1: Perception of Neighborhood Violence (1=high, 3=low) 
+pese2: Trend in Neighborhood Violence (1=high, 3=low) - aoj17: Gang Presence in Neighborhood (1 = a lot, 4 = none) - 
+diso7: Youth Loitering a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
+diso8: Youth in Gangs a Problem in the Neighborhood (1 = very serious, 5 = not a problem) -
+diso10: Illegal Drug Trafficking a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
+diso18: Gang Fights a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
+diso14: Drug Addicts a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
+diso16: Assaults a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
+diso17: Shootings a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
+vicbar1: Burglaries in the Neighborhood (1=yes, 2=no) - 
+vicbar1f: Number of Occurrences of Burglaries in Neighborhood (1 = weekly, 3=yearly) - 
+vicbar3: Sales of Illegal Drugs in Neighborhood (1=yes, 2=no) - vicbar4: Extortion or Blackmail in the Neighborhood (1=yes, 2=no)
+- vicbar7: Murders in the Neighborhood (1=yes, 2=no) - a4 == 5,14,27,30,57: Biggest problem related to crime/violence/security
+
+```{r}
+library(ggplot2)
+library(mice)
+library(plyr)
+library(GGally)
+my_data <- lapop.2014.HND[,c('vic40', 'vic41', 'vic44', 'vic43',
+                             'fear10','fear6f','vic1ext','vic1exta',
+                             'vic1hogar','aoj11','pese1','pese2','aoj17',
+                             'diso7','diso8','diso10','diso18','diso14',
+                             'diso16','diso17','vicbar1','vicbar1f',
+                             'vicbar3','vicbar4','vicbar7')]
+my_data$vic1exta[my_data$vic1exta == 999999] <- 0
+is.na(my_data[my_data>30]) <- TRUE
+is.na(my_data[my_data>30]) <- TRUE
+
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete, center = TRUE, scale = FALSE)
+plot(pr_complete)
+
+summary(pr_complete)
+```
+
+Only 39% of total variance winds up in the first component.
+```{r}
+my_imp <- mice(my_data, printFlag = F)
+my_imp
+```
+
+Moving onto the PCA:
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+plot(pr[[1]])
+summary(pr[[1]])
+```
+
+Imputation actually increased the fraction of variance in the first component to 44%.
+```{r}
+pc1 <- pr[[1]]$x[,1]
+pc2 <- pr[[1]]$x[,2]
+qplot(pc1,pc2)
+```
+
+```{r}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
+ggpairs(all_pc1) + theme_classic()
+
+all_pc1$avg <- rowMeans(all_pc1)
+quantile(all_pc1$avg)
+```
+Plot of PC1 vs PC2 shows a much smoother distribution than before; this probably isn’t dominated by a singe discrete variable. Correlations for different imputed datasets are about 0.997 – imputation is much more consistent when you use more data.
+
+Compared to the lowest quantile, the highest quantile of our proposed index has:
+
+Higher values for vic40, vic41, vic43, fear6f (higher values of these mean less fear) also: vic1ext, vic1hogar, pese1, pese2, aoj17, diso7, diso8, diso10, diso14, diso16, diso17, vicbar1, vicbar1f, vicbar3, vicbar4, vicbar7 About the same values for vic45 (got imputed a lot; probably really noisy) Lower values for vic44 and fear10 (lower values of these mean not changing behavior) lower values for vic1exta, aoj11, a4
+
+So it looks like (as before) high values of the index indicate not being particularly concerned about crime and violence.
+```{r}
+all_pc1$norm <- scale(-all_pc1$avg) # sign flip -- now high values mean more fear
+predict_data <- data.frame(vic40 = c(2,1), vic41 = c(2,1), vic43 = c(2,1), 
+                           vic44 = c(0,1), fear10 = c(0,1), 
+                           fear6f = c(4,1), vic1ext = c(2,1),vic1exta=c(0,15),
+                           vic1hogar=c(2,1),aoj11=c(1,4),pese1=c(3,1),
+                           pese2=c(3,1),aoj17=c(4,1),diso7=c(5,1),diso8=c(5,1),
+                           diso10=c(5,1),diso18=c(5,1),diso14=c(5,1),
+                           diso16=c(5,1),diso17=c(5,1),vicbar1=c(2,1),
+                           vicbar1f=c(3,1),vicbar3=c(2,1),vicbar4=c(2,1),
+                           vicbar7=c(2,1))
+
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (mean(all_pc1$avg) - minmax) / sd(all_pc1$avg)
+
+quantile(all_pc1$norm)
+
+fear <- data.frame(w=all_pc1$norm) 
+```
+```{r}
+predict_data2 <- data.frame(diag(25))
+names(predict_data2) <- names(predict_data)
+# right now, you have something that would feed 0's and 1's into your score
+# prediction -- this doesn't really make sense because many of your questions
+# are on a scale from 1-2 or 1-4. Here's one (slightly clunky) way to fix it:
+predict_data2$vic40 <- 2 - predict_data2$vic40
+predict_data2$vic41 <- 2 - predict_data2$vic41
+predict_data2$vic43 <- 2 - predict_data2$vic43
+predict_data2$fear6f <- 4 - 3*predict_data2$fear6f 
+predict_data2$vic1ext <- 2 - predict_data2$vic1ext
+predict_data2$vic1hogar <- 2 - predict_data2$vic1hogar
+predict_data2$aoj11 <- 1 + 3*predict_data2$aoj11
+predict_data2$aoj17 <- 4 - 3*predict_data2$aoj17
+predict_data2$pese1 <- 3 - 2*predict_data2$pese1
+predict_data2$pese2 <- 3 - 2*predict_data2$pese2
+predict_data2$diso7 <- 5 - 4*predict_data2$diso7
+predict_data2$diso8 <- 5 - 4*predict_data2$diso8
+predict_data2$diso10 <- 5 - 4*predict_data2$diso10
+predict_data2$diso18 <- 5 - 4*predict_data2$diso18
+predict_data2$diso14 <- 5 - 4*predict_data2$diso14
+predict_data2$diso16 <- 5 - 4*predict_data2$diso16
+predict_data2$diso17 <- 5 - 4*predict_data2$diso17
+predict_data2$vicbar1 <- 2 - predict_data2$vicbar1
+predict_data2$vicbar1f <- 3 - 2*predict_data2$vicbar1f
+predict_data2$vicbar3 <- 2 - predict_data2$vicbar3
+predict_data2$vicbar4 <- 2 - predict_data2$vicbar4
+predict_data2$vicbar7 <- 2 - predict_data2$vicbar7
+```
+
+
+# Now, in each row of predict_data2, all values are those that will give a lower score,
+# except for one.
+```{r}
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- (mean(all_pc1$avg)-scores)/sd(all_pc1$avg)
+```
+# Now you can see that all of the scores are reasonably close to the minimum value
+# stored in minmax.
+```{r}
+diff <- data.frame(d=(scores-minmax[1]), n = names(predict_data))
+ggplot(diff, aes(x=n,y=d)) + 
+  geom_bar(stat = 'identity', fill = 'skyblue') + 
+  coord_flip() + 
+  theme_classic() + 
+  theme(text = element_text(size=20), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank())
+```
+
+#So vic45 (changing jobs out of fear of crime) and a4 (what is the biggest problem?) don’t have a really strong influence here; we might want to drop them from the index. The ones that really dominate here are the diso indicators, asking people what they feel is a problem in their neighborhood.
+
+```{r}
+fear10 <- data.frame(q=my_data$fear10,w=fear$w)
+my_lm <- lm(data=fear10, q ~ w)
+summary(my_lm)
+
+ggplot(fear10,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+  size=10,x=-1.5,y=1,hjust=0,vjust=0,color='royalblue') +
+  ylab('fear10') +
+  xlab('Fear index') +
+  theme(text=element_text(size=20))
+```
+
+```{r}
+fear6f index – correlation is about the same as it was with the original fear index.
+
+fear6f <- data.frame(q=my_data$fear6f,w=fear$w)
+my_lm <- lm(data=fear6f, q ~ w)
+summary(my_lm)
+
+ggplot(fear6f,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+  size=10,x=0.5,y=4,hjust=0,vjust=0,color='royalblue') +
+  ylab('fear10') +
+  xlab('Fear index') +
+  theme(text=element_text(size=20))
+
+```
+
+#This is a good correlation, but it’s not nearly as strong as what we saw with the old version of this index, because fear10 doesn’t dominate it as completely as before.
+```{r}
+diso8 <- data.frame(q=my_data$diso8,w=fear$w)
+my_lm <- lm(data=diso8, q ~ w)
+summary(my_lm)
+
+ggplot(diso8,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+  size=10,x=0.5,y=4,hjust=0,vjust=0,color='royalblue') +
+  ylab('diso8') +
+  xlab('Fear index') +
+  theme(text=element_text(size=20))
+```
+
+P-Values for variables that can have more than 2 values fear6f
+```{r}
+lmp <- function (modelobject) {
+  if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+    f <- summary(modelobject)$fstatistic
+    p <- pf(f[1],f[2],f[3],lower.tail=F)
+    attributes(p) <- NULL
+    return(p)
+}
+lm_data <- my_data[,c('fear6f','vic1exta','aoj11','aoj17','pese1','pese2',
+                      'diso7','diso8','diso10','diso14','diso16','diso17',
+                      'diso18','vicbar3')]
+p_vals <- sapply(lm_data, function(x) lmp(lm(x ~ all_pc1$norm)))
+p-values for binary variables
+
+log_data <- my_data[,c('vic40','vic41','vic43','vic1ext','vic1hogar',
+                       'vicbar1','vicbar3','vicbar4','vicbar7')]
+log_data <- log_data-1
+log_data$vic44 <- my_data[,'vic44']
+log_data$fear10 <- my_data[,'fear10']
+
+p_vals <- sapply(log_data, function(x) coef(summary(glm(x ~ all_pc1$norm,family=binomial(logit))))[2,4])
+```
+
+vic45 and a4 appear not to be highly significant; we might want to drop those.
