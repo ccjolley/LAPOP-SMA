@@ -5,12 +5,39 @@ date: "31 October 2015"
 output: html_document
 ---
 
-At the top of the document, please explain:
-- What you are trying to measure with this index
-- Which variables you are including and the range of values for each (i.e. "1=yes, 2=no" or "1=a lot, 5=not at all")
-- If you've explicitly chosen not to include some relevant-looking variables, what they are and why.
+The following is a proposal for a Trust in Government Index, for which the following variables were considered to be the most relevant in determining the citizens' trust in all civic, public, political and governmental structures:
 
-You didn't originally have the `set.seed(12345)` command in there -- I didn't include it in the wealth index either, but it's a good idea. This specifies the starting point for the random number generator used in multiple imputation and ensures that the results of your analysis will be identical every time.
+`b1`: Belief in judicial system delivering just sentences (1=None at all, 7=High)
+`b2`: Respect for political institutions (1=None at all, 7=High)
+`b3`: Human rights are protected by the political system (1=None at all, 7=High)
+`b4`: Sense of pride in national political system (1=None at all, 7=High)
+`b6`: Support for national political system (1=None at all, 7=High)
+`b10a`: Trust in judicial system (1=None at all, 7=High)
+`b11`: Trust in Supreme Electoral Tribunal (1=None at all, 7=High)
+`b12`: Trust in Armed Forces (1=None at all, 7=High)
+`b13`: Trust in Congress / Parliament (1=None at all, 7=High)
+`b18`: Trust in law enforcement / police force (1=None at all, 7=High)
+`b21`: Trust in political parties (1=None at all, 7=High)
+`b21a`: Trust in President (1=None at all, 7=High)
+`b32`: Trust in municipality (1=None at all, 7=High) 
+`b37`: Trust in media (1=None at all, 7=High)
+`b47a`: Trust in national electoral system (1=None at all, 7=High)
+`b14`: Trust in Central Government (1=None at all, 7=High)
+`b15`: Trust in Ministry of Public Affairs (1=None at all, 7=High)
+`b19`: Trust in Superior Tribunal of Accounts (1=None at all, 7=High)
+`b46`: Trust in National Council Against Corruption (1=None at all, 7=High) 
+`honb51`: Trust in Human Rights Commission (1=None at all, 7=High)
+`venb11`: Belief that votes are kept secret (1=None at all, 7=High)
+`epp1`: Political parties represent voters (1=None at all, 7=High)
+`epp3`: Political parties listen to individuals (1=None at all, 7=High)
+`n9`: Current administration's efforts in fighting corruption (1=None at all, 7=High)
+`n11`: Current administration's efforts in improving security (1=None at all, 7=High) 
+`n15`: Current administration is handling the economy well (1=None at all, 7=High)
+`b3milx`: The Armed Forces respect human rights (1=None at all, 7=High) 
+
+Variables measuring the levels of trust in religious institutions, such as the Catholic and the Protestant Churches, were left out of this proposed index, since they do not partake in the structures of government and political and civil affairs - regardless, of their influence in the citizens' daily lives. 
+
+The `set.seed(12345)` command was not included in this index or the wealth index, but it's a good idea. This specifies the starting point for the random number generator used in multiple imputation and ensures that the results of your analysis will be identical every time.
 
 ```{r}
 library(ggplot2)
