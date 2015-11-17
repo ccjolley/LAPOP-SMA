@@ -152,7 +152,7 @@ ggplot(diff,aes(x=n,y=d)) +
 - If you look at `quantile(all_pc1$norm)`, you'll see that the minimum value is slightly higher than the lower value in `minmax`, and the maximum slightly lower than the higher value in `minmax`. This is good.
 - When you make the bar plot, you'll notice that all of the values are negative. This is because `predict_data2` is full of 1's and 2's -- that means you're starting with a baseline of no trust (1) and moving up to a tiny bit of trust (2). The resulting scores (stored in the variable `scores`) are all close to the maximum value of your index (which is stored in `minmax[1]`). Since you're subtracting the maximum from these perturbed scores (in line 110), everything comes out negative, which is sort of funny. It also tells us that higher values of the index mean less trust, which isn't very intuitive.
 
-*The recommendation was, therefore, to replace the code you have above with the following:*
+*The recommendation was, therefore, to replace the abovementioned code with the following:*
 
 ```{r}
 all_pc1$norm <- -scale(all_pc1$avg) # reversed; now low scores mean low trust
