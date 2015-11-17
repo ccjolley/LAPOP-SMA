@@ -24,7 +24,7 @@ The following is a proposal for a Trust in Government Index, for which the follo
 * `b47a`: Trust in national electoral system (1=Not at all, 7=A lot)
 * `b14`: Trust in Central Government (1=Not at all, 7=A lot)
 * `b15`: Trust in Ministry of Public Affairs (1=Not at all, 7=A lot)
-*`b19`: Trust in Superior Tribunal of Accounts (1=Not at all, 7=A lot)
+* `b19`: Trust in Superior Tribunal of Accounts (1=Not at all, 7=A lot)
 * `b46`: Trust in National Council Against Corruption (1=Not at all, 7=A lot) 
 * `honb51`: Trust in Human Rights Commission (1=Not at all, 7=A lot)
 * `venb11`: Belief that votes are kept secret (1=Not at all, 7=A lot)
