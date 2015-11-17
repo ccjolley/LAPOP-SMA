@@ -7,33 +7,35 @@ output: html_document
 
 The following is a proposal for a Trust in Government Index, for which the following variables were considered to be the most relevant in determining the citizens' trust in all civic, public, political and governmental structures:
 
-* `b1`: Belief in judicial system delivering just sentences (1=Not at all, 7=A lot)
-* `b2`: Respect for political institutions (1=Not at all, 7=A lot)
-* `b3`: Human rights are protected by the political system (1=Not at all, 7=A lot)
-* `b4`: Sense of pride in national political system (1=Not at all, 7=A lot)
-* `b6`: Support for national political system (1=Not at all, 7=A lot)
-* `b10a`: Trust in judicial system (1=Not at all, 7=A lot)
-* `b11`: Trust in Supreme Electoral Tribunal (1=Not at all, 7=A lot)
+* `b1`: Courts Guarantee a Fair Trial (1=Not at all, 7=A lot)
+* `b2`: Respect for Political Institutions (1=Not at all, 7=A lot)
+* `b3`: Respect for Basic Rights (1=Not at all, 7=A lot)
+* `b4`: Pride in Political System (1=Not at all, 7=A lot)
+* `b6`: People Should Support the Political System (1=Not at all, 7=A lot)
+* `b10a`: Trust in Judicial System (1=Not at all, 7=A lot)
+* `b11`: Trust in the National Electoral Institution (1=Not at all, 7=A lot)
 * `b12`: Trust in Armed Forces (1=Not at all, 7=A lot)
-* `b13`: Trust in Congress / Parliament (1=Not at all, 7=A lot)
-* `b18`: Trust in law enforcement / police force (1=Not at all, 7=A lot)
-* `b21`: Trust in political parties (1=Not at all, 7=A lot)
-* `b21a`: Trust in President (1=Not at all, 7=A lot)
-* `b32`: Trust in municipality (1=Not at all, 7=A lot) 
-* `b37`: Trust in media (1=Not at all, 7=A lot)
-* `b47a`: Trust in national electoral system (1=Not at all, 7=A lot)
-* `b14`: Trust in Central Government (1=Not at all, 7=A lot)
-* `b15`: Trust in Ministry of Public Affairs (1=Not at all, 7=A lot)
-* `b19`: Trust in Superior Tribunal of Accounts (1=Not at all, 7=A lot)
-* `b46`: Trust in National Council Against Corruption (1=Not at all, 7=A lot) 
-* `honb51`: Trust in Human Rights Commission (1=Not at all, 7=A lot)
-* `venb11`: Belief that votes are kept secret (1=Not at all, 7=A lot)
-* `epp1`: Political parties represent voters (1=Not at all, 7=A lot)
-* `epp3`: Political parties listen to individuals (1=Not at all, 7=A lot)
-* `n9`: Current administration's efforts in fighting corruption (1=Not at all, 7=A lot)
-* `n11`: Current administration's efforts in improving security (1=Not at all, 7=A lot) 
-* `n15`: Current administration is handling the economy well (1=Not at all, 7=A lot)
-* `b3milx`: The Armed Forces respect human rights (1=Not at all, 7=A lot) 
+* `b13`: Trust in National Legislature (1=Not at all, 7=A lot)
+* `b18`: Trust in National Police (1=Not at all, 7=A lot)
+* `b21`: Trust in Political Parties (1=Not at all, 7=A lot)
+* `b21a`: Trust in Executive (1=Not at all, 7=A lot)
+* `b32`: Trust in Local Government (1=Not at all, 7=A lot) 
+* `b37`: Trust in the Media (1=Not at all, 7=A lot)
+* `b47a`: Trust in Elections (1=Not at all, 7=A lot)
+* `b14`: Trust in the Central Government (1=Not at all, 7=A lot)
+* `b15`: Trust in the Public Ministry (1=Not at all, 7=A lot)
+* `b19`: Trust in Superior Court of Accounts (1=Not at all, 7=A lot)
+* `b46`: Trust in National Anticorruption Council (1=Not at all, 7=A lot) 
+* `honb51`: Trust in Commission for Human Rights (1=Not at all, 7=A lot)
+* `venb11`: Trust in the secret vote in Honduras (1=Not at all, 7=A lot)
+* `venhonb51`: Trust that election results reflect the votes issued (1=Not at all, 7=A lot)
+* `venhonvb10`: Level of agreement for having international observers at elections (1=Not at all, 7=A lot)
+* `epp1`: Political parties represent voters well (1=Not at all, 7=A lot)
+* `epp3`: Political parties listen to voters (1=Not at all, 7=A lot)
+* `n9`: Evaluation of administration's handling of corruption (1=Not at all, 7=A lot)
+* `n11`: Evaluation of administration's handling of citizen security (1=Not at all, 7=A lot) 
+* `n15`: Evaluation of administration's handling of economy (1=Not at all, 7=A lot)
+* `b3milx`: Armed Forces respect human rights (1=Not at all, 7=A lot) 
 
 Variables measuring the levels of trust in religious institutions, such as the Catholic and the Protestant Churches, were left out of this proposed index, since they do not partake in the structures of government and political and civil affairs - regardless, of their influence in the citizens' daily lives. 
 
@@ -52,18 +54,20 @@ set.seed(12345) # makes imputation reproducible
 
 ```{r}
 lapop.2014.HND <- read.csv('../2014-HND.csv')
-my_data <- lapop.2014.HND[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13','b18','b21','b21a','b32', 'b37','b47a','b14','b15','b19','b46','honb51','venb11','venhonvb10','epp1','epp3','n9','n11','n15', 'b3milx')]
+my_data <- lapop.2014.HND[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13','b18','b21','b21a','b32', 'b37','b47a','b14','b15','b19','b46','honb51','venb11', 'venhonb51', 'venhonvb10','epp1','epp3','n9','n11','n15', 'b3milx')]
 ```
 
-
+Firstly, how many missing values do we have here?
 ```{r}
 is.na(my_data[my_data>16]) <- TRUE
 nrow(na.omit(my_data))
 ```
+So, with the missing values we have 1,129 rows left
 
 ```{r}
 sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
 ```
+Around 2% of missing variables. Not bad.
 
 ```{r}
 my_complete <- na.omit(my_data)
@@ -97,7 +101,7 @@ qplot(pc1,pc2)
 
 ```
 
-First indication that things seem to be going well... (Extra points if you can say what about this plot makes me feel that way.)
+First indication that things seem to be going well... a cluster is forming between all the variables.
 
 ```{r}
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
@@ -115,13 +119,14 @@ colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
 colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
 ```
 
-I see changes, some of them quite large, but without an explanation (at the top of the document, ideally) of which variables we're looking at, it's hard  to know what these changes mean and whether they make intuitive sense.
-
-Without interpreting changes, it's hard to know whether a high value of this index corresponds to high or low trust in government.
+I'm seeing that the higher values are located on the bottom (25%) quantile. To reverse this:
 
 ```{r}
-all_pc1$norm <- scale(all_pc1$avg)
+all_pc1$norm <- scale(-all_pc1$avg)
+colMeans(my_data[all_pc1$norm < quantile(all_pc1$norm)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc1$norm > quantile(all_pc1$norm)[4],],na.rm=TRUE)
 ```
+What are we seeing now? At first sight, the higher values are all now on the higher (25%) quantile, compared to the lower (25%) quantile. However, there is not a great difference separating the values on either quantile. A note apart should be made for `b21a`(Trust in Executive), where, compared to the lower quantile, the value in the higher quantile is much larger.
 
 ```{r}
 predict_data <- data.frame(b1=c(1,7),b2=c(1,7),b3=c(1,7),b4=c(1,7),
@@ -181,7 +186,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.x=element_blank())
 ```
 
-Now everything seems to be pointing the right direction.
+Now everything seems to be pointing the right direction. All variables seem to have a big influence on the Trust Index, except for `b1` , `b2` , `b6` and `b37`.
 
 As suggested, by the Authoritarianism index, we can be more rigorous here by calculating the p-values.
 
