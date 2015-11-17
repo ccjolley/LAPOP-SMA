@@ -146,12 +146,13 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.x=element_blank())
 ```
 
-There are a few potential issues here:
+**For future reference**
+*As pointed out by Craig, the code listed above ran into the following potential issues:*
 - The first value in `minmax` (ostensibly the minimum) is higher than the second (maximum). This could be an indication that `predict_data` wasn't set up correctly, or that high values of your index correspond to low trust, rather than high. The first row in `predict_data` should be the answers that a person with the minimum possible level of trust in government would have given; the second should be the answers showing a maximum level of trust.
 - If you look at `quantile(all_pc1$norm)`, you'll see that the minimum value is slightly higher than the lower value in `minmax`, and the maximum slightly lower than the higher value in `minmax`. This is good.
 - When you make the bar plot, you'll notice that all of the values are negative. This is because `predict_data2` is full of 1's and 2's -- that means you're starting with a baseline of no trust (1) and moving up to a tiny bit of trust (2). The resulting scores (stored in the variable `scores`) are all close to the maximum value of your index (which is stored in `minmax[1]`). Since you're subtracting the maximum from these perturbed scores (in line 110), everything comes out negative, which is sort of funny. It also tells us that higher values of the index mean less trust, which isn't very intuitive.
 
-I'd recommend replacing the code you have above with the following:
+*The recommendation was, therefore, to replace the code you have above with the following:*
 
 ```{r}
 all_pc1$norm <- -scale(all_pc1$avg) # reversed; now low scores mean low trust
@@ -181,6 +182,8 @@ ggplot(diff,aes(x=n,y=d)) +
 ```
 
 Now everything seems to be pointing the right direction.
+
+As suggested, by the Authoritarianism index, we can be more rigorous here by calculating the p-values.
 
 ```{r}
 lmp <- function (modelobject) {
@@ -213,10 +216,11 @@ ggplot(b37,aes(x=w,y=q)) +
   ylab('b37') +
   xlab('Composite index') +
   theme(text=element_text(size=20))
-
 ```
 
-My original intention was to remove the variables: `b1` , `b2` , `b6` and `b37` , as they were the least influential in this proposed index. However, when we calculated the p-values for all of these variables, we concluded that they were still pretty significant. The proposed index remains as is. 
+My original intention was to remove the variables: `b1` , `b2` , `b6` and `b37` , as they were the least influential in this proposed index. However, when we calculated the p-values for all of these variables, we concluded that they were still pretty significant. The proposed index remains as is.
+
+**Now let's see how we can apply the same methodology for the Trust Index for both Guatemala and El Salvador!**
 
 
 
