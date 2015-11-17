@@ -216,7 +216,7 @@ ggplot(b37,aes(x=w,y=q)) +
 
 ```
 
-My original intention was to remove the variables: 'b1' , 'b2' , 'b6' and 'b37' , as they were the least influential in this proposed index. However, when we calculated the p-values for all of these variables, we concluded that they were still pretty significant. The proposed index remains as is. 
+My original intention was to remove the variables: `b1` , `b2` , `b6` and `b37` , as they were the least influential in this proposed index. However, when we calculated the p-values for all of these variables, we concluded that they were still pretty significant. The proposed index remains as is. 
 
 
 
