@@ -76,7 +76,7 @@ plot(pr_complete)
 summary(pr_complete)
 ```
 
-If we don't do any imputation, 39.6% of variance is contained in the first principal component; the others all appear to be much lower.
+If we don't do any imputation, 39.8% of variance is contained in the first principal component; the others all appear to be much lower.
 
 ```{r}
 my_imp <- mice(my_data,printFlag = F) 
@@ -92,7 +92,7 @@ summary(pr[[1]])
 
 ```
 
-After imputation, things don't change much -- 38.1% of variance is in the first PC.
+After imputation, things don't change much -- 38.6% of variance is in the first PC.
 
 ```{r}
 pc1 <- pr[[1]]$x[,1]
@@ -126,7 +126,15 @@ all_pc1$norm <- scale(-all_pc1$avg)
 colMeans(my_data[all_pc1$norm < quantile(all_pc1$norm)[2],],na.rm=TRUE)
 colMeans(my_data[all_pc1$norm > quantile(all_pc1$norm)[4],],na.rm=TRUE)
 ```
-What are we seeing now? At first sight, the higher values are all now on the higher (25%) quantile, compared to the lower (25%) quantile. However, there is not a great difference separating the values on either quantile. A note apart should be made for `b21a`(Trust in Executive), where, compared to the lower quantile, the value in the higher quantile is much larger.
+What are we seeing now? At first sight, the higher values are all now on the higher (25%) quantile, compared to the lower (25%) quantile. There are much larger values for:
+* `b21`
+* `b21a`
+* `b47a`
+* `b19`
+* `b46`
+* `venb11`
+* `venhonb51`
+* `epp3`
 
 ```{r}
 predict_data <- data.frame(b1=c(1,7),b2=c(1,7),b3=c(1,7),b4=c(1,7),
