@@ -146,7 +146,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.x=element_blank())
 ```
 
-**For future reference**
+**For future reference!**
 *As pointed out by Craig, the code listed above ran into the following potential issues:*
 - The first value in `minmax` (ostensibly the minimum) is higher than the second (maximum). This could be an indication that `predict_data` wasn't set up correctly, or that high values of your index correspond to low trust, rather than high. The first row in `predict_data` should be the answers that a person with the minimum possible level of trust in government would have given; the second should be the answers showing a maximum level of trust.
 - If you look at `quantile(all_pc1$norm)`, you'll see that the minimum value is slightly higher than the lower value in `minmax`, and the maximum slightly lower than the higher value in `minmax`. This is good.
