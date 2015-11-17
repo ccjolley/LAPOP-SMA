@@ -216,67 +216,7 @@ ggplot(b37,aes(x=w,y=q)) +
 
 ```
 
-So... which variables did you omit here and why?
-`names(my_data)[!(names(my_data) %in% names(my_data2))]` tells me you left out b1, b2, b6, and b37 -- these had less influence than the others, but not by very much. I'd suggest leaving them in
-
-```{r}
-my_data2 <- lapop.2014.HND[,c('b3', 'b4','b10a','b11','b12','b13', 'b18','b21','b21a','b32', 'b47a','b14','b15','b19','b46', 'honb51', 'venb11', 'venhonvb10', 'epp1', 'epp3', 'n9', 'n11', 'n15', 'b3milx')]
-```
-
-```{r}
-is.na(my_data2[my_data2>16]) <- TRUE
-my_complete2 <- na.omit(my_data2)
-pr_complete2 <- prcomp(my_complete2,center=TRUE,scale=FALSE)
-plot(pr_complete2)
-summary(pr_complete2)
-```
-
-```{r}
-my_imp2 <- mice(my_data2,printFlag = F) 
-pr2 <- lapply(1:5,function(x) prcomp(complete(my_imp2,x),scale=FALSE,center=TRUE))
-plot(pr2[[1]]) 
-summary(pr2[[1]])
-
-```
-
-`critics_tol` is probably not a very good name for what you're doing here.
-
-```{r}
-critics_tol <- data.frame(llply(1:5, function(i) pr2[[i]]$x[,1]))
-names(critics_tol) <- c('imp1','imp2','imp3','imp4','imp5')
-ggpairs(critics_tol) + theme_classic()
-```
-
-```{r}
-critics_tol$avg <- rowMeans(critics_tol)
-critics_tol$norm <- scale(critics_tol$avg)
-colMeans(my_data2[critics_tol$norm < quantile(critics_tol$norm)[2],],na.rm=TRUE)
-colMeans(my_data2[critics_tol$norm > quantile(critics_tol$norm)[4],],na.rm=TRUE)
-```
-
-```{r}
-sapply(c('b3','b4','b10a','b11','b12','b13','b18','b21','b21a','b32','b47a','b14','b15','b19','b46', 'honb51', 'venb11', 'venhonvb10', 'epp1', 'epp3', 'n9', 'n11', 'n15', 'b3milx'),
- function(x) lmp(lm(critics_tol$norm ~ my_data[,x])))
-
-```
-
-```{r}
-venhonvb10 <- data.frame(q=my_data$venhonvb10,w=critics_tol$norm)
-venhonvb10 <- na.omit(venhonvb10)
-my_lm <- lm(data=venhonvb10, q ~ w)
-summary(my_lm)
-ggplot(venhonvb10,aes(x=w,y=q)) +
-  geom_jitter(color='tomato3',size=5,alpha=0.2) +
-  theme_classic() +
-  geom_smooth(method='lm',size=2,color='royalblue') +
-  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
-           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
-  ylab('venhonvb10') +
-  xlab('Composite index') +
-  theme(text=element_text(size=20))
-
-
-```
+My original intention was to remove the variables: 'b1' , 'b2' , 'b6' and 'b37' , as they were the least influential in this proposed index. However, when we calculated the p-values for all of these variables, we concluded that they were still pretty significant. The proposed index remains as is. 
 
 
 
