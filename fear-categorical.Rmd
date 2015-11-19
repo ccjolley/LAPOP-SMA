@@ -1,18 +1,9 @@
 ---
-title: "Geography of fear"
+title: "Fear and unordered categorical variables"
 author: "Craig Jolley"
-date: "November 5, 2015"
+date: "November 19, 2015"
 output: html_document
 ---
-
-For now, I'm basing this on a version of the fear index where I'm removing `vic45` and `a4`. In addition, the following variables were not collected in El Salvador (although they were in both Honduras and Guatemala):
-
-- `vic40`: Out of fear of crime, has limited the places to go shopping
-- `vic41`: Out of fear of crime, has limited the places to go for recreation
-- `vic43`: Out of fear of crime, has felt the need to change neighborhoods
-- `fear6f`: Insecurity at Schools
-
-
 ```{r}
 library(ggplot2)
 library(mice)
@@ -41,6 +32,7 @@ my_imp <- mice(my_data, printFlag = F)
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
 
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
 all_pc1$imp1 <- -all_pc1$imp1
 all_pc1$imp4 <- -all_pc1$imp4
 all_pc1$avg <- rowMeans(all_pc1)
@@ -50,6 +42,7 @@ all_pc1$norm <- scale(-all_pc1$avg) # sign flip -- now high values mean more fea
 Let's see how people's level of fear correlates with their answers to `a4` -- the most serious problem facing the country. This is a little tricky, since the coding is consistent between countries (e.g. `a4=4` means poverty everywhere), but not all of the possible answers were on the questionnaire for any given country. If any country-specific answers turn out to be significant, we'll have to make sure they're significant at a country level as well.
 
 ```{r}
+fear <- data.frame(w=all_pc1$norm)
 a4 <- c(lapop.2014.HND$a4,lapop.2014.SLV$a4,lapop.2014.GTM$a4)
 a4[a4==888888] <- NA
 a4[a4==988888] <- NA
@@ -62,7 +55,6 @@ categ_unsorted <- function(f,x,categ) {
   # rest of the population. Do this using a two-sample t-test.
   result <- data.frame(var=character(),val=integer(),pval=double(),
                        mean=double(),othermean=double())
-  print(unique(f[,categ]))
   for(q in unique(na.omit(f[,categ]))) {
     if(sum(f[,categ]==q,na.rm=TRUE) > 1) {
       yes <- fear[fear[,categ]==q,x]
@@ -77,8 +69,7 @@ categ_unsorted <- function(f,x,categ) {
   result
 }
 
-cu <- categ_unsorted(fear,'w','a4')
-cu[cu$pval<0.05,]
+categ_unsorted(fear,'w','a4')
 ```
 
 So it looks like the only strong correlation here is that people who are concerned about human rights violations are significantly *less* fearful than the rest of the population. 
