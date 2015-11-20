@@ -19,9 +19,9 @@ library(mice)
 library(plyr)
 library(GGally)
 
-lapop.2014.HND <- read.csv("../2014-HND.csv")
-lapop.2014.SLV <- read.csv("../2014-SLV.csv")
-lapop.2014.GTM <- read.csv("../2014-GTM.csv")
+lapop.2014.HND <- read.csv("../2014-HND.csv",stringsAsFactors=FALSE)
+lapop.2014.SLV <- read.csv("../2014-SLV.csv",stringsAsFactors=FALSE)
+lapop.2014.GTM <- read.csv("../2014-GTM.csv",stringsAsFactors=FALSE)
 set.seed(12345) # for reproducibility
 
 incl <- c('vic44','fear10','vic1ext',
@@ -61,10 +61,10 @@ colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm = TRUE)
 colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],], na.rm = TRUE)
 ```
 
-It looks like this is inverted, so that the low values of the index correspond to higher levels of fear.
+The values look to be reversed -- higher scores seem to correlate with less fear. Let's reverse things.
 
 ```{r}
-all_pc1$norm <- scale(-all_pc1$avg) # sign flip -- now high values mean more fear
+all_pc1$norm <- scale(-all_pc1$avg) 
 predict_data <- data.frame(vic44 = c(0,1), fear10 = c(0,1), 
                            vic1ext = c(2,1),vic1exta=c(0,20),
                            vic1hogar=c(2,1),aoj11=c(1,4),pese1=c(3,1),
@@ -79,7 +79,7 @@ tmp <- sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1])
 tmp[,1] <- -tmp[,1]
 tmp[,4] <- -tmp[,4]
 minmax <- rowMeans(tmp)
-minmax <- (mean(all_pc1$avg) - minmax) / sd(all_pc1$avg)
+minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg)
 # you can check that the values in minmax are really close to the minimum and maximum values you 
 # get from quantile(all_pc1$norm)
 
@@ -117,7 +117,7 @@ tmp <- sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1])
 tmp[,1] <- -tmp[,1]
 tmp[,4] <- -tmp[,4]
 scores <- rowMeans(tmp)
-scores <- (mean(all_pc1$avg)-scores)/sd(all_pc1$avg)
+scores <- -(scores - mean(all_pc1$avg))/sd(all_pc1$avg)
 # Now you can see that all of the scores are reasonably close to the minimum value
 # stored in minmax.
 
@@ -158,6 +158,16 @@ log_data$vic44 <- my_data[,'vic44']
 log_data$fear10 <- my_data[,'fear10']
 
 sapply(log_data, function(x) coef(summary(glm(x ~ all_pc1$norm,family=binomial(logit))))[2,4])
+```
+
+Finally, let's save ourselves the headache of doing this again:
+
+```{r}
+ids <- c(lapop.2014.GTM$idnum,
+         lapop.2014.HND$idnum,
+         lapop.2014.SLV$idnum)
+output <- data.frame(idnum=ids,fear=all_pc1$norm)
+write.csv(output,'fear.csv')
 ```
 
 OK. So now we've got a fear index for all three countries. Now we need to get the relevant geographic information for each.
