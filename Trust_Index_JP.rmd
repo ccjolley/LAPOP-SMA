@@ -62,12 +62,12 @@ Firstly, how many missing values do we have here?
 is.na(my_data[my_data>16]) <- TRUE
 nrow(na.omit(my_data))
 ```
-So, with the missing values we have 1,129 rows left
+So, ignoring missing values, we have 1,120 rows left
 
 ```{r}
 sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
 ```
-Around 2% of missing variables. Not bad.
+Around 2.3% of missing variables. Not bad.
 
 ```{r}
 my_complete <- na.omit(my_data)
@@ -126,7 +126,39 @@ all_pc1$norm <- scale(-all_pc1$avg)
 colMeans(my_data[all_pc1$norm < quantile(all_pc1$norm)[2],],na.rm=TRUE)
 colMeans(my_data[all_pc1$norm > quantile(all_pc1$norm)[4],],na.rm=TRUE)
 ```
-What are we seeing now? In all, I am considering a few things here: we are taking the average value for the responses to each variable. This scale is represented as 1=Not at all, and 7=A lot. Taking a look at the average values on both the lower (25%) quantile, and the higher (25%) quantile for each variable, I am not seeing any strong differences when comparing both quantiles. My intuition tells me that for most of these questions regarding trust in the government, the responses had a tendency to meet somewhere in the middle. However, there is one variable that stands out to me, compared to the others: `b21a`(Trust in Executive), which presents an average value of 2.4 on the lower (25%) quantile, and a an average value of 6.1 on the higher (25%) quantile. A priori this indicates to me that there is a higher level of trust on the Executive, and that the opinions were much stronger on this question than on the others.
+What are we seeing now?
+**Note:** My logic is the following:
+- When comparing the higher (75%) quartile to the lower (25%) quartile, I took the interquartile range for each variable into account. The less spread out the interquartile range, the more I was driven to deduce that the trust lied somewhere in the middle (here labeled as 'some' or 'medium'); the amount of trust depended on the values of the variables on each quantile.
+
+* Lower levels of trust in courts guaranteeing fair trial (`b1`)
+* Some respect for political institutions (`b2`)
+* Lower levels of trust in government respecting basic rights (`b3`)
+* Some division in regards to pride in political system (`b4`), but overall some respect in the system
+* Some support for political system (`b6`)
+* Some division again regarding trust in judicial system (`b10a`), more trust towards it, generally speaking
+* Low to medium trust in national electoral institution (`b11`)
+* More trust in armed forces (`b12`)
+* Some trust in national legislature (`b13`)
+* Some trust in national police (`b18`)
+* Lower levels of trust for political parties
+* `b21a`(Trust in Executive) seems like a tricky one. While the 25% quartile has a value of 2.42, the higher 75% quartile has a value of 6.1 - giving it a rather spread out interquartile range. My immediate guess is that there is some level of trust for the executive, but this is a topic that divides a good amount of people.
+* Some trust in local government (`b32`)
+* Medium trust in the Media (`b37`)
+* Not much trust in the elections (`b47a`), trust is pretty low
+* Lower trust in Central Government (`b14`)
+* Lower trust in Public Ministry (`b15`)
+* Lower trust in Superior Court of Accounts(`b19`)
+* Low trust in National Anticorruption Council (`b46`)
+* Medium to low levels of trust in Human Rights Council (`honb51`)
+* Lower trust in vote being kept secret (`venb11`)
+* Lower trust in results reflecting votes (`venhonb51`)
+* Some agreement in having international observers at elections (`venhonvb10`)
+* Medium to low trust in political parties representing voters well (`epp1`)
+* Low confidence in political parties listening to voters (`epp3`)
+* Some confidence in Administration's handling of corruption (`n9`)
+* Some confidence in Administration's handling of citizen security (`n11`)
+* Some confidence in Administration's handling of economy (`n15`)
+* Some trust in military respecting Human Rights (`b3milx`)
 
 
 
