@@ -1,0 +1,176 @@
+The following is a proposed index, measuring the level of civic and political participation, and civil socity involvement of the individuals interrogated. Variables such as 'Attendance to religious meetings' and 'Sports Activities' were excluded, due to them not directly falling into the categories previously listed. In all, do individuals participate in making their community's social and political environment better? If so, how often?
+
+* `cp5`: Tried to solve a community problem (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
+* `cp7`: Attended meetings of Parent Association (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
+* `cp8`: Attended meetings of Community Improvement Association (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
+* `cp13`: Attended meetings of a Political Party (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
+* `cp20`: Attended meetings of Women's Group (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
+* `honcp22`: Help for security groups (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
+* `honcp21a`: Help for neighborhood associations (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
+
+The two latter elements are particular to Honduras, and are not present for the data on El Salvador and Guatemala. They may eventually be removed for a composite index.
+
+```{r}
+library(ggplot2)
+#install.packages("mice") # if you don't have it already
+library(mice)
+library(plyr) # nice for re-formatting data
+#install.packages("GGally") # if you don't have it already
+library(GGally) # for plot matrices
+set.seed(12345) # makes imputation reproducible
+```
+
+```{r}
+my_data <- lapop.2014.HND[,c('cp5','cp7','cp8','cp13','cp20','honcp22','honcp21a')]
+```
+
+```{r}
+is.na(my_data[my_data>16]) <- TRUE
+nrow(na.omit(my_data))
+```
+Ignoring missing values, we are looking at 762 rows left
+
+```{r}
+sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
+```
+7.5% of values missing!
+
+```{r}
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+plot(pr_complete)
+summary(pr_complete)
+```
+Without any imputation, 32.7% of variance is concentrated on the first principal component.
+
+```{r}
+my_imp <- mice(my_data,printFlag = F) 
+my_imp
+```
+None of the variables really need any imputation, EXCEPT `cp20`, which was question conditioned on the subject being male.
+
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+plot(pr[[1]])
+summary(pr[[1]])
+```
+With the imputation, we don't have much change. 32.5% of variance is concentrated on the first principal component.
+
+```{r}
+pc1 <- pr[[1]]$x[,1]
+pc2 <- pr[[1]]$x[,2]
+qplot(pc1,pc2)
+```
+
+```{r}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc1) + theme_classic()
+```
+And yes! We have some great correlations.
+
+```{r}
+all_pc1$avg <- rowMeans(all_pc1)
+quantile(all_pc1$avg)
+colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+```
+When comparing the lower 25% quartile to the higher 75% quartile, all of the variables show that the subjects are not often engaged in these kinds of activities; in some cases, they are never present.
+* Some initiative in trying to solve a community problem `b5`; however, judging by the number of people that are never present, I am assuming that these meetings have some exclusivity. Not surprising!
+* The case above is also applicable to:
+** `cp7`: Meetings to Parent Association
+** `cp8`: Meetings to Community Improvement Association
+** `honcp21a`: Help for neighborhood associations.
+
+In the instance that there is a:
+* Meetings of a Political Party (`b13`)
+* Meeting of a Women's Group (`b20`)
+* Help for Security Groups (`honcp22`)
+The participation is slim to none.
+
+It would be interesting to look more into the profile of the people that do engage in these activities.
+
+```{r}
+all_pc1$norm <- scale(all_pc1$avg) 
+predict_data <- data.frame(cp5=c(1,4),cp7=c(1,4),cp8=c(1,4),
+                           cp13=c(1,4),cp20=c(1,4),honcp22=c(1,4),
+                           honcp21a=c(1,4))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) 
+
+predict_data2 <- data.frame(diag(7)+1)
+names(predict_data2) <- names(my_data)
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+ggplot(diff,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+All variables have a strong influence on the index.
+
+```{r}
+lmp <- function (modelobject) {
+    if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+    f <- summary(modelobject)$fstatistic
+    p <- pf(f[1],f[2],f[3],lower.tail=F)
+    attributes(p) <- NULL
+    return(p)
+}
+sapply(c('cp5','cp7','cp8','cp13','cp20','honcp22','honcp21a'),
+       function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
+```
+
+p-values for `cp13`, `cp20` and `honcp22`are quite small compared to the rest.
+
+```{r}
+cp7 <- data.frame(q=my_data$cp7,w=all_pc1$norm)
+cp7 <- na.omit(cp7)
+my_lm <- lm(data=cp7, q ~ w)
+summary(my_lm)
+ggplot(cp7,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
+  ylab('cp7') +
+  xlab('Composite index') +
+  theme(text=element_text(size=20)) 
+```
+
+```{r}
+cp13 <- data.frame(q=my_data$cp13,w=all_pc1$norm)
+cp13 <- na.omit(cp13)
+my_lm <- lm(data=cp13, q ~ w)
+summary(my_lm)
+ggplot(cp13,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
+  ylab('cp13') +
+  xlab('Composite index') +
+  theme(text=element_text(size=20)) 
+```
+
+```{r}
+cp20 <- data.frame(q=my_data$cp20,w=all_pc1$norm)
+cp20 <- na.omit(cp20)
+my_lm <- lm(data=cp20, q ~ w)
+summary(my_lm)
+ggplot(cp20,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
+  ylab('cp20') +
+  xlab('Composite index') +
+  theme(text=element_text(size=20)) 
+```

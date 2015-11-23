@@ -1,0 +1,111 @@
+Adding to the list of indeces, the following is a proposed Extorsion index. The variables chosen represent questions that relate to the request for a bribe from any civil or governmental institution. 
+
+* `exc2`: Police Officer asked for a bribe (0=No, 1=Yes)
+* `exc6`: Government Employee asked for a bribe (0=No, 1=Yes)
+* `exc20`: Soldier requested a bribe (0=No, 1=Yes)
+* `exc11`: Bribe requested to process document in Municipal Government (0=No, 1=Yes)
+* `exc13`: Asked to pay a bribe at work (0=No, 1=Yes)
+* `exc14`: Asked to pay a bribe at the courts (0=No, 1=Yes)
+* `exc15`: Asked to pay a bribe to use health services (0=No, 1=Yes)
+* `exc16`: Asked to pay a bribe at school (0=No, 1=Yes)
+* `exc7`: Paying a bribe is justified (0=No, 1=Yes)
+
+```{r}
+library(ggplot2)
+#install.packages("mice") # if you don't have it already
+library(mice)
+library(plyr) # nice for re-formatting data
+#install.packages("GGally") # if you don't have it already
+library(GGally) # for plot matrices
+set.seed(12345) # makes imputation reproducible
+```
+
+```{r}
+my_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16','exc7')]
+```
+
+```{r}
+is.na(my_data[my_data>16]) <- TRUE
+nrow(na.omit(my_data))
+```
+Now, here it looks like we're running into trouble. Ignoring the missing values, we have 7 rows left. 
+
+```{r}
+sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
+```
+38.2% of values missing
+
+```{r}
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+plot(pr_complete)
+summary(pr_complete)
+```
+Without any imputation, 68% of variance is concentrated on the first principal component.
+
+```{r}
+my_imp <- mice(my_data,printFlag = F) 
+my_imp
+```
+Now, notice how `exc11`, `exc13`, `exc14`, `exc15`, and `exc16` needed a great amount of imputation This is, because all of these questions were conditional upon the response of some previous questions. e.g. To be asked only if the response to `exc11f`= '1'. Then there is `exc98` that also was missing a lot of values, most likely as a result of people not knowing how to respond to or feeling uncomfortable to answer the question of justification of bribery.
+
+Looks like this one will be difficult!
+
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+plot(pr[[1]])
+summary(pr[[1]])
+```
+With the imputation, we start seeing a slight change, with 61.3% of variance concentrated on the first principal component.
+
+```{r}
+pc1 <- pr[[1]]$x[,1]
+pc2 <- pr[[1]]$x[,2]
+qplot(pc1,pc2)
+```
+
+```{r}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc1) + theme_classic()
+```
+Overall, some good correlations, but nothing perfect.
+
+```{r}
+all_pc1$avg <- rowMeans(all_pc1)
+quantile(all_pc1$avg)
+colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+```
+I will need some verification here to see if my quantiles are in the proper order; i.e. higher numbers on the higher quantile, and lower numbers in the lower quantile.
+
+```{r}
+all_pc1$norm <- -scale(all_pc1$avg) 
+predict_data <- data.frame(exc2=c(0,1),exc6=c(0,1),exc20=c(0,1),exc11=c(0,1),
+                           exc13=c(0,1),exc14=c(0,1),exc15=c(0,1),exc16=c(0,1),
+                           exc7=c(0,1))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg)  
+
+predict_data2 <- data.frame(diag(9)+1)
+names(predict_data2) <- names(my_data)
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- -(scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+ggplot(diff,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+All variables seem to have a really strong influence in the index.
+
+```{r}
+log_data <- my_data[,c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16','exc7')]
+log_data <- log_data - 1 #convert to 0-1 scale
+p_vals <- sapply(log_data, function(x) coef(summary(glm(x ~ all_pc1$norm,family=binomial(logit))))[2,4])
+p_vals
+```
+I'm not sure how this works on your computer, but from mine, it keeps bringing back variables from another index.
