@@ -111,7 +111,7 @@ log_data <- log_data - 1 #convert to 0-1 scale
 p_vals <- sapply(log_data, function(x) coef(summary(glm(x ~ all_pc1$norm,family=binomial(logit))))[2,4])
 p_vals
 ```
-Coincidentally, `pv2f`and `pv2h`have also got the lowest p-values of the group.
+So! If my conversation with Craig, yesterday, helped with improving my comprehension of scientific notation, then the values listed above display p-values that should definitely be taken into consideration - given how small they are!
 
 ```{r}
 pv2f <- data.frame(q=my_data$pv2f,w=all_pc1$norm)
