@@ -125,7 +125,7 @@ sapply(c('cp5','cp7','cp8','cp13','cp20','honcp22','honcp21a'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
 
-p-values for `cp13`, `cp20` and `honcp22`are quite small compared to the rest.
+Taking a look at the p-values for all of the variables, we see that they are pretty significant. Really small numbers for all!
 
 ```{r}
 cp7 <- data.frame(q=my_data$cp7,w=all_pc1$norm)
