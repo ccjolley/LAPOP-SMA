@@ -551,7 +551,7 @@ sapply(c('b1','b2','b3', 'b4','b6','b10a','b12','b13',
                              'b18','b21','b21a','b32', 'b47a','n9','n11','n15', 'b3milx', 'pr4'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
-The values are high for all variables.
+The p-values for all of the variables are significantly small, meaning that it looks like we have a model here.
 
 ```{r}
 b2 <- data.frame(q=my_data$b2,w=all_pc1$norm)
