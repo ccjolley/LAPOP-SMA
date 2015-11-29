@@ -429,115 +429,8 @@ sapply(c('b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
                              'b18','b21','b21a','b32', 'b47a','esb48','n9','n11','n15', 'epp1', 'epp3', 'b3milx', 'pr4', 'epn3a', 'epn3b','epn3c'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
-Both `epn3b`and `epn3c`have low values, such is not the case for `epn3a`. 
+all of the variables bear significance, making the decision to remove some variables a bit difficult. Any advice? 
 
-```{r}
-epn3c <- data.frame(q=my_data$epn3c,w=all_pc1$norm)
-epn3c <- na.omit(epn3c)
-my_lm <- lm(data=epn3c, q ~ w)
-summary(my_lm)
-ggplot(epn3c,aes(x=w,y=q)) +
-  geom_jitter(color='tomato3',size=5,alpha=0.2) +
-  theme_classic() +
-  geom_smooth(method='lm',size=2,color='royalblue') +
-  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
-           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
-  ylab('epn3c') +
-  xlab('Composite index') +
-  theme(text=element_text(size=20))
-```
-
-
-```{r}
-epn3a <- data.frame(q=my_data$epn3a,w=all_pc1$norm)
-epn3a <- na.omit(epn3a)
-my_lm <- lm(data=epn3a, q ~ w)
-summary(my_lm)
-ggplot(epn3a,aes(x=w,y=q)) +
-  geom_jitter(color='tomato3',size=5,alpha=0.2) +
-  theme_classic() +
-  geom_smooth(method='lm',size=2,color='royalblue') +
-  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
-           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
-  ylab('epn3a') +
-  xlab('Composite index') +
-  theme(text=element_text(size=20))
-```
-Hmm...the r-squared value of `epn3a`is to be considered. For now, I will eliminate both `epn3b`and `epn3c`.
-
-```{r}
-my_data2 <- lapop.2014.SLV[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13','b18','b21','b21a','b32', 'b47a','esb48','n9','n11','n15','epp1','epp3','b3milx','pr4','epn3a')]
-```
-
-```{r}
-is.na(my_data2[my_data2>16]) <- TRUE
-my_complete2 <- na.omit(my_data2)
-pr_complete2 <- prcomp(my_complete2,center=TRUE,scale=FALSE)
-plot(pr_complete2)
-summary(pr_complete2)
-```
-40.5% of variance is already concentrated on the first principal component.
-
-```{r}
-my_imp2 <- mice(my_data2,printFlag = F) 
-pr2 <- lapply(1:5,function(x) prcomp(complete(my_imp2,x),scale=FALSE,center=TRUE))
-plot(pr2[[1]]) 
-summary(pr2[[1]])
-```
-Following the imputation, 40% of the variance in concentrated on the first principal component. So, not much has changed.
-
-```{r}
-all_pc2 <- data.frame(llply(1:5, function(i) pr2[[i]]$x[,1]))
-names(all_pc2) <- c('imp1','imp2','imp3','imp4','imp5')
-ggpairs(all_pc2) + theme_classic()
-```
-The correlations are VERY strong here.
-
-```{r}
-all_pc2$avg <- rowMeans(all_pc2)
-all_pc2$norm <- scale(all_pc2$avg)
-colMeans(my_data2[all_pc2$norm < quantile(all_pc2$norm)[2],],na.rm=TRUE)
-colMeans(my_data2[all_pc2$norm > quantile(all_pc2$norm)[4],],na.rm=TRUE)
-```
-Not much increase in the values here.
-
-```{r}
-sapply(c('b1','b2','b3','b4','b10a','b11','b12','b13','b18','b21','b21a','b32','b47a','esb48','n9','n11','n15', 'epp1', 'epp3', 'b3milx', 'pr4', 'epn3a'),
- function(x) lmp(lm(all_pc2$norm ~ my_data[,x])))
-```
-Beautiful.
-
-```{r}
-b2 <- data.frame(q=my_data2$b2,w=all_pc2$norm)
-b2 <- na.omit(b2)
-my_lm <- lm(data=b2, q ~ w)
-summary(my_lm)
-ggplot(b2,aes(x=w,y=q)) +
-  geom_jitter(color='tomato3',size=5,alpha=0.2) +
-  theme_classic() +
-  geom_smooth(method='lm',size=2,color='royalblue') +
-  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
-           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
-  ylab('b2') +
-  xlab('Composite index') +
-  theme(text=element_text(size=20)) 
-```
-
-```{r}
-epn3a <- data.frame(q=my_data2$epn3a,w=all_pc2$norm)
-epn3a <- na.omit(epn3a)
-my_lm <- lm(data=epn3a, q ~ w)
-summary(my_lm)
-ggplot(b2,aes(x=w,y=q)) +
-  geom_jitter(color='tomato3',size=5,alpha=0.2) +
-  theme_classic() +
-  geom_smooth(method='lm',size=2,color='royalblue') +
-  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
-           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
-  ylab('epn3a') +
-  xlab('Composite index') +
-  theme(text=element_text(size=20)) 
-```
 
 Finally, we move on to Guatemala!
 
@@ -691,7 +584,7 @@ ggplot(b2,aes(x=w,y=q)) +
   xlab('Composite index') +
   theme(text=element_text(size=20))
 ```
-Having the lowest p-values, R-squared values for both `b2`and `m1`are the same.
+R-squared values for both `b2`and `m1`are the same.
 
 So, to conclude, the following are the variables to be taken into account for a comparative trust index between the nations of the Northern Triangle.
 
