@@ -3,7 +3,7 @@ calbano
 
 October 18, 2015
 ```{r}
-lapop.2014.HND <- read.csv("~/Desktop/Honduras_Data_LAPOP_americasbarometer_2014.csv")
+lapop.2014.HND <- read.csv("../HND-2014.csv")
 ```
 
 This time around, let’s go with the big list: - vic40: Out of fear of crime, has limited the places to go shopping 
@@ -171,7 +171,7 @@ ggplot(fear10,aes(x=w,y=q)) +
 ```
 
 ```{r}
-fear6f index – correlation is about the same as it was with the original fear index.
+#fear6f index – correlation is about the same as it was with the original fear index.
 
 fear6f <- data.frame(q=my_data$fear6f,w=fear$w)
 my_lm <- lm(data=fear6f, q ~ w)
