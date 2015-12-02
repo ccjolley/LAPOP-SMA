@@ -10,26 +10,25 @@ Adding to the list of indices, the following is a proposed Extorsion index. The 
 * `exc16`: Asked to pay a bribe at school (0=No, 1=Yes)
 * `exc7`: Perception of public corruption (1=common, 4=uncommon)
 
-```{r}
+```{r, message=FALSE}
 library(ggplot2)
-#install.packages("mice") # if you don't have it already
 library(mice)
 library(plyr) # nice for re-formatting data
-#install.packages("GGally") # if you don't have it already
 library(GGally) # for plot matrices
 set.seed(12345) # makes imputation reproducible
 ```
 
 ```{r}
 lapop.2014.GTM <- read.csv("../GTM-2014.csv")
-my_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16','exc7')]
+my_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14',
+                             'exc15','exc16','exc7')]
 ```
 
 Since many of these questions are asking people to report on rare events, we should start by looking to see whether there are any that co-occur.
 
 ```{r}
-test_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16')]
-names(test_data) <- c('police','gov','soldier','muni','work','courts','health','school')
+test_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14',
+                               'exc15','exc16')]
 test_data[test_data>16] <- 0 # assume that non-responses mean no bribe paid
 colMeans(test_data)
 jitter_data <- data.frame(police=jitter(test_data$police,factor=2),
@@ -48,15 +47,16 @@ It's really disturbing that 14% of people report having paid bribes to the polic
 Because there are so many NA responses, let's try assuming that NA means 'no' for these 8 indices, and only impute exc7.
 
 ```{r}
-is.na(my_data[my_data>16]) <- TRUE
+is.na(my_data$exc7[my_data$exc7>16]) <- TRUE
+my_data[my_data>16] <- 0
 nrow(na.omit(my_data))
 ```
-Now, here it looks like we're running into trouble. Ignoring the missing values, we have 7 rows left. 
+Since we've made this assumption, we have 1408 rows with complete data. 
 
 ```{r}
 sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
 ```
-38.2% of values missing
+0.7% of values missing
 
 ```{r}
 my_complete <- na.omit(my_data)
@@ -64,15 +64,13 @@ pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
 plot(pr_complete)
 summary(pr_complete)
 ```
-Without any imputation, 68% of variance is concentrated on the first principal component.
+Without any imputation, 72% of variance is concentrated on the first principal component. This seems suspiciously good, like only one variable is doing all the work.
 
 ```{r}
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
-Now, notice how `exc11`, `exc13`, `exc14`, `exc15`, and `exc16` needed a great amount of imputation This is, because all of these questions were conditional upon the response of some previous questions. e.g. To be asked only if the response to `exc11f`= '1'. Then there is `exc98` that also was missing a lot of values, most likely as a result of people not knowing how to respond to or feeling uncomfortable to answer the question of justification of bribery.
-
-Looks like this one will be difficult!
+As expected, only exc7 requires any imputation.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -87,33 +85,70 @@ pc2 <- pr[[1]]$x[,2]
 qplot(pc1,pc2)
 ```
 
-```{r}
-all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
-names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
-ggpairs(all_pc1) + theme_classic()
-```
-Overall, some good correlations, but nothing perfect.
+This isn't cool. Our PC1 is pretty much completely determined by a single variable with four levels -- based on the last iteration we can be pretty sure that it's `exc7`. What happens if we just take it out, so that we're looking at people's actual experiences with corruption rather than their perception of it?
 
 ```{r}
-all_pc1$avg <- rowMeans(all_pc1)
-quantile(all_pc1$avg)
-colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
-colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+pr_noexc7 <- prcomp(test_data,scale=FALSE,center=TRUE)
+plot(pr_noexc7)
+summary(pr_noexc7) # 48% of variance in the first component -- not bad, considering
+qplot(pr_noexc7$x[,1],pr_noexc7$x[,2])
 ```
-I will need some verification here to see if my quantiles are in the proper order; i.e. higher numbers on the higher quantile, and lower numbers in the lower quantile.
+
+Now we're seeing one binary variable that really dominates. If you look up at the previous PC1/PC2 plot, this was probably the one that dominated PC2.
+
+If our real question is "how much extorsion are people experiencing?", then it might be easier to just look at a sum of the types of bribes any one person was asked to pay.
 
 ```{r}
-all_pc1$norm <- -scale(all_pc1$avg) 
+ex_sum <- rowSums(test_data)
+plotme <- data.frame(x=ex_sum,y=my_data$exc7)
+ggplot(plotme,aes(x=x,y=y)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  ylab('exc7') +
+  xlab('Sum of other variables') +
+  theme(text=element_text(size=20)) 
+my_lm <- lm(data=plotme, y ~ x)
+summary(my_lm)
+```
+
+While the plot seems to show a trend that people who think extortion is a serious problem (exc7 = 1 or 2) paid more bribes (high sum), the linear regression doesn't necessarily support this (low R-squared, high p-value). Most people seem to think corruption is a serious problem, and most of the people who think this aren't admitting to paying bribes.
+
+Is there a relationship between `exc7` and any of the individual extortion variables?
+
+```{r}
+t.test(my_data[my_data$exc2==1,'exc7'],my_data[my_data$exc2==0,'exc7'],alternative="less")$p.value
+t.test(my_data[my_data$exc6==1,'exc7'],my_data[my_data$exc6==0,'exc7'],alternative="less")$p.value
+t.test(my_data[my_data$exc11==1,'exc7'],my_data[my_data$exc11==0,'exc7'],alternative="less")$p.value
+t.test(my_data[my_data$exc13==1,'exc7'],my_data[my_data$exc13==0,'exc7'],alternative="less")$p.value
+t.test(my_data[my_data$exc14==1,'exc7'],my_data[my_data$exc14==0,'exc7'],alternative="less")$p.value
+t.test(my_data[my_data$exc15==1,'exc7'],my_data[my_data$exc15==0,'exc7'],alternative="less")$p.value
+t.test(my_data[my_data$exc16==1,'exc7'],my_data[my_data$exc16==0,'exc7'],alternative="less")$p.value
+t.test(my_data[my_data$exc20==1,'exc7'],my_data[my_data$exc20==0,'exc7'],alternative="less")$p.value
+```
+
+So only `exc2` has a correlation that is even borderline-significant. I think it might be time to kick `exc7` out of this index -- it doesn't have much to do with the others.
+
+```{r}
+pc1_noexc7 <- pr_noexc7$x[,1]
+quantile(pc1_noexc7)
+mean(pc1_noexc7 == min(pc1_noexc7))
+colMeans(my_data[pc1_noexc7 == min(pc1_noexc7),],na.rm=TRUE)
+colMeans(my_data[pc1_noexc7 > quantile(pc1_noexc7)[4],],na.rm=TRUE)
+```
+
+The people with the minimum value of the composite index (79% of the population) didn't pay any bribes, but are only slightly less likely to consider corruption a problem than the people in the upper quartile, the majority of whom have paid at least one.
+
+```{r}
+pc1_norm <- scale(pc1_noexc7) 
 predict_data <- data.frame(exc2=c(0,1),exc6=c(0,1),exc20=c(0,1),exc11=c(0,1),
-                           exc13=c(0,1),exc14=c(0,1),exc15=c(0,1),exc16=c(0,1),
-                           exc7=c(0,1))
-minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
-minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg)  
+                           exc13=c(0,1),exc14=c(0,1),exc15=c(0,1),exc16=c(0,1))
+minmax <- predict(pr_noexc7,predict_data)[,1]
+minmax <- (minmax - mean(pc1_noexc7)) / sd(pc1_noexc7)  
 
-predict_data2 <- data.frame(diag(9)+1)
-names(predict_data2) <- names(my_data)
-scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
-scores <- -(scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
+predict_data2 <- data.frame(diag(8))
+names(predict_data2) <- names(predict_data)
+scores <- predict(pr_noexc7,predict_data2)[,1]
+scores <- (scores-mean(pc1_noexc7)) / sd(pc1_noexc7) 
 diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
 ggplot(diff,aes(x=n,y=d)) +
   geom_bar(stat='identity',fill='skyblue') +
@@ -123,15 +158,65 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
-All variables seem to have a really strong influence in the index.
+
+`exc2` and `exc6` have a strong influence, the others not as much.
+
+I can't get the logistic regression calculations to work, so we'll do this using a t-test instead.
 
 ```{r}
-log_data <- my_data[,c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16')]
-#log_data <- log_data - 1 #convert to 0-1 scale
-p_vals <- sapply(log_data, function(x) coef(summary(glm(x ~ all_pc1$norm,family=binomial(logit))))[2,4])
-p_vals
+t.test(pc1_norm[my_data$exc2==1],pc1_norm[my_data$exc2==0])$p.value
+t.test(pc1_norm[my_data$exc6==1],pc1_norm[my_data$exc6==0])$p.value
+t.test(pc1_norm[my_data$exc11==1],pc1_norm[my_data$exc11==0])$p.value
+t.test(pc1_norm[my_data$exc13==1],pc1_norm[my_data$exc13==0])$p.value
+t.test(pc1_norm[my_data$exc14==1],pc1_norm[my_data$exc14==0])$p.value
+t.test(pc1_norm[my_data$exc15==1],pc1_norm[my_data$exc15==0])$p.value
+t.test(pc1_norm[my_data$exc16==1],pc1_norm[my_data$exc16==0])$p.value
+t.test(pc1_norm[my_data$exc20==1],pc1_norm[my_data$exc20==0])$p.value
 ```
 
-None of these correlations are significant.
+`exc2`, `exc6`, `exc11`, and `exc13` are unquestionably significant; the others are borderline (or worse). Does our ex_sum variable do any better?
 
+```{r}
+t.test(ex_sum[my_data$exc2==1],ex_sum[my_data$exc2==0])$p.value
+t.test(ex_sum[my_data$exc6==1],ex_sum[my_data$exc6==0])$p.value
+t.test(ex_sum[my_data$exc11==1],ex_sum[my_data$exc11==0])$p.value
+t.test(ex_sum[my_data$exc13==1],ex_sum[my_data$exc13==0])$p.value
+t.test(ex_sum[my_data$exc14==1],ex_sum[my_data$exc14==0])$p.value
+t.test(ex_sum[my_data$exc15==1],ex_sum[my_data$exc15==0])$p.value
+t.test(ex_sum[my_data$exc16==1],ex_sum[my_data$exc16==0])$p.value
+t.test(ex_sum[my_data$exc20==1],ex_sum[my_data$exc20==0])$p.value
+```
 
+This time they're all significant. So if we want one number that captures people's experience of extortion, this might be our best choice. 
+
+```{r}
+exc2 <- data.frame(q=my_data$exc2,w=ex_sum)
+exc2 <- na.omit(exc2)
+my_lm <- lm(data=exc2, q ~ w)
+summary(my_lm)
+ggplot(exc2,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=1,hjust=0,vjust=0,color='royalblue') +
+  ylab('exc2') +
+  xlab('Simple sum') +
+  theme(text=element_text(size=20)) 
+```
+
+```{r}
+exc14 <- data.frame(q=my_data$exc14,w=ex_sum)
+exc14 <- na.omit(exc14)
+my_lm <- lm(data=exc14, q ~ w)
+summary(my_lm)
+ggplot(exc14,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=1,hjust=0,vjust=0,color='royalblue') +
+  ylab('exc14') +
+  xlab('Simple sum') +
+  theme(text=element_text(size=20)) 
+```
