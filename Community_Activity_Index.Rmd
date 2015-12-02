@@ -21,6 +21,7 @@ set.seed(12345) # makes imputation reproducible
 ```
 
 ```{r}
+lapop.2014.HND <- read.csv("../HND-2014.csv")
 my_data <- lapop.2014.HND[,c('cp5','cp7','cp8','cp13','cp20','honcp22','honcp21a')]
 ```
 
