@@ -25,6 +25,7 @@ set.seed(12345) # makes imputation reproducible
 ```
 
 ```{r}
+lapop.2014.GTM <- read.csv("../GTM-2014.csv")
 my_data <- lapop.2014.GTM[,c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f','pv2g','pv2h','pv2i','pv2j','pv2k')]
 ```
 
