@@ -1,4 +1,4 @@
-Adding to the list of indeces, the following is a proposed Extorsion index. The variables chosen represent questions that relate to the request for a bribe from any civil or governmental institution. 
+Adding to the list of indices, the following is a proposed Extorsion index. The variables chosen represent questions that relate to the request for a bribe from any civil or governmental institution. (Beginning on page 51 of codebook PDF.)
 
 * `exc2`: Police Officer asked for a bribe (0=No, 1=Yes)
 * `exc6`: Government Employee asked for a bribe (0=No, 1=Yes)
@@ -8,7 +8,7 @@ Adding to the list of indeces, the following is a proposed Extorsion index. The 
 * `exc14`: Asked to pay a bribe at the courts (0=No, 1=Yes)
 * `exc15`: Asked to pay a bribe to use health services (0=No, 1=Yes)
 * `exc16`: Asked to pay a bribe at school (0=No, 1=Yes)
-* `exc7`: Paying a bribe is justified (0=No, 1=Yes)
+* `exc7`: Perception of public corruption (1=common, 4=uncommon)
 
 ```{r}
 library(ggplot2)
@@ -21,8 +21,31 @@ set.seed(12345) # makes imputation reproducible
 ```
 
 ```{r}
+lapop.2014.GTM <- read.csv("../GTM-2014.csv")
 my_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16','exc7')]
 ```
+
+Since many of these questions are asking people to report on rare events, we should start by looking to see whether there are any that co-occur.
+
+```{r}
+test_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16')]
+names(test_data) <- c('police','gov','soldier','muni','work','courts','health','school')
+test_data[test_data>16] <- 0 # assume that non-responses mean no bribe paid
+colMeans(test_data)
+jitter_data <- data.frame(police=jitter(test_data$police,factor=2),
+                          gov=jitter(test_data$gov,factor=2),
+                          soldier=jitter(test_data$soldier,factor=2),
+                          muni=jitter(test_data$muni,factor=2),
+                          work=jitter(test_data$work,factor=2),
+                          courts=jitter(test_data$courts,factor=2),
+                          health=jitter(test_data$health,factor=2),
+                          school=jitter(test_data$school,factor=2))
+ggpairs(jitter_data) + theme_classic()
+```
+
+It's really disturbing that 14% of people report having paid bribes to the police. The plot is a little confusing, but the main thing to take away from it is that, for each possible pair of bribes, there are at least a few people who paid both. This gives me some hope that this could be the basis for a composite index. 
+
+Because there are so many NA responses, let's try assuming that NA means 'no' for these 8 indices, and only impute exc7.
 
 ```{r}
 is.na(my_data[my_data>16]) <- TRUE
@@ -103,9 +126,12 @@ ggplot(diff,aes(x=n,y=d)) +
 All variables seem to have a really strong influence in the index.
 
 ```{r}
-log_data <- my_data[,c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16','exc7')]
-log_data <- log_data - 1 #convert to 0-1 scale
+log_data <- my_data[,c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16')]
+#log_data <- log_data - 1 #convert to 0-1 scale
 p_vals <- sapply(log_data, function(x) coef(summary(glm(x ~ all_pc1$norm,family=binomial(logit))))[2,4])
 p_vals
 ```
-I'm not sure how this works on your computer, but from mine, it keeps bringing back variables from another index.
+
+None of these correlations are significant.
+
+
