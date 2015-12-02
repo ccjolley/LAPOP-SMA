@@ -5,9 +5,9 @@ date: "November 29, 2015"
 output: html_document
 ---
 ```{r}
-lapop.2014.HND <- read.csv("~/Desktop/Honduras_Data_LAPOP_americasbarometer_2014.csv")
-lapop.2014.GTM <- read.csv("~/Desktop/Guatemala_Data_LAPOP_americasbarometer_2014.csv")
-lapop.2014.SLV <- read.csv("~/Desktop/ElSalvador_Data_LAPOP_americasbarometer_2014.csv")
+lapop.2014.HND <- read.csv("../HND-2014.csv")
+lapop.2014.GTM <- read.csv("../GTM-2014.csv")
+lapop.2014.SLV <- read.csv("../SLV-2014.csv")
 
 library(mice)
 library(plyr)
