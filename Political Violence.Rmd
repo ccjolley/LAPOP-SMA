@@ -1,5 +1,6 @@
 The following is a proposed index for Political Violence, a phenomenon that has affected all three nations of the Northern Triangle, in varying degrees. While the studies done by LAPOP, do not provide any indicators of political violence for El Salvador and Honduras, there are several elements to take into consideration, so as to better comprehend the fabric of institutionalized violence in Guatemala.
 All of the variables chosen reflect the responses of whether or not the people, being interrogated, have witnessed any acts of violence related to political identification or electoral cycles.
+
 * `pv1`: Witnessed an act of violence linked to the 2011 campaign (1=Yes, 2=No)
 * `pv2a`: Was attacked because of his/her political position (1=Yes, 2=No)
 * `pv2b`: Received threats from a candidate to vote for him (1=Yes, 2=No)
@@ -14,19 +15,18 @@ All of the variables chosen reflect the responses of whether or not the people, 
 * `pv2k`: There was political repression in a political event in the community (1=Yes, 2=No)
 
 
-```{r}
+```{r, message=FALSE}
 library(ggplot2)
-#install.packages("mice") # if you don't have it already
 library(mice)
 library(plyr) # nice for re-formatting data
-#install.packages("GGally") # if you don't have it already
 library(GGally) # for plot matrices
 set.seed(12345) # makes imputation reproducible
 ```
 
 ```{r}
 lapop.2014.GTM <- read.csv("../GTM-2014.csv")
-my_data <- lapop.2014.GTM[,c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f','pv2g','pv2h','pv2i','pv2j','pv2k')]
+my_data <- lapop.2014.GTM[,c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f',
+                             'pv2g','pv2h','pv2i','pv2j','pv2k')]
 ```
 
 ```{r}
@@ -52,7 +52,7 @@ Without imputation, 37.8% of variance is concentrated on the first principal com
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
-Thus far, not many variables seem to be needing any imputation. `pv1` (witnessed an act of violence linked to the 2011 campaign) is the one variable that is missing the most amount of cells per column. Judging from the options, this may be attributed to lack of awareness or unwillingness to respond.
+Thus far, not many variables seem to be needing a lot of imputation. `pv1` (witnessed an act of violence linked to the 2011 campaign) is the one variable that is missing the most amount of cells per column. Judging from the options, this may be attributed to lack of awareness or unwillingness to respond.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -67,34 +67,45 @@ pc2 <- pr[[1]]$x[,2]
 qplot(pc1,pc2)
 ```
 
+The data points seem to separate into two discrete clusters with some overlap in the first principal component. My guess is that there's one binary variable that's making a really big difference -- what is it?
+
 ```{r}
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
-Overall, we have got some strong correlations. 
+
+Overall, we have got some strong correlations. Distributions skew very strongly toward the low end.
 
 ```{r}
 all_pc1$avg <- rowMeans(all_pc1)
-quantile(all_pc1$avg)
-colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
-colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+mean(all_pc1$avg == min(all_pc1$avg))
 ```
-So, now, we are entering territory were I may be inclined to pressing the "help" button. I am noticing that the lower 25% quartile has a value of NaN ("not a number") for every variable. However, looking at the higher 75% quartile, I am inclined to say that the majority of people responded "no" on each question. Considering that this is an index of witnessing of political violence, this may not be too alarming. A priori, the cases of political violence may be reserved to particular areas. 
+
+In fact, 80% of people have the minimum score for this index. This means that quantile calculations are going to be tricky; instead we'll look at this minimum and then at the upper 25%.
 
 ```{r}
-all_pc1$norm <- -scale(all_pc1$avg) 
-predict_data <- data.frame(pv1=c(1,2),pv2a=c(1,2),pv2b=c(1,2),pv2c=c(1,2),
-                           pv2d=c(1,2),pv2e=c(1,2),pv2f=c(1,2),
-                           pv2g=c(1,2),pv2h=c(1,2),pv2i=c(1,2),pv2j=c(1,2),
-                           pv2k=c(1,2))
-minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
-minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) 
+quantile(all_pc1$avg)
+colMeans(my_data[all_pc1$avg == min(all_pc1$avg),],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+```
 
-predict_data2 <- data.frame(diag(12)+1)
+So people with the (very common) minimum score just said "no" to everything. For those who said yes to something, it seems most often to have been `pv1` (witnessing an act of violence related to the 2011 campaign). In general, though the scale makes sense -- people who experienced political violence have higher values of the composite score. 
+
+```{r}
+all_pc1$norm <- scale(all_pc1$avg) 
+predict_data <- data.frame(pv1=c(2,1),pv2a=c(2,1),pv2b=c(2,1),pv2c=c(2,1),
+                           pv2d=c(2,1),pv2e=c(2,1),pv2f=c(2,1),
+                           pv2g=c(2,1),pv2h=c(2,1),pv2i=c(2,1),pv2j=c(2,1),
+                           pv2k=c(2,1))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) 
+# agrees with quantile(all_pc1$norm)
+
+predict_data2 <- data.frame(2-diag(12))
 names(predict_data2) <- names(my_data)
 scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
-scores <- -(scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
 diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
 ggplot(diff,aes(x=n,y=d)) +
   geom_bar(stat='identity',fill='skyblue') +
@@ -104,15 +115,20 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
-I am noticing that `pv1`is by far the indicator with the strongest influence in the index. Such is the opposite for `pv2f`(Candidate in the community assassinated during the campaign) and `pv2h` (Political assassinations in the community)
+
+I am noticing that `pv1`is by far the indicator with the strongest influence in the index. Such is the opposite for `pv2f`(Candidate in the community assassinated during the campaign) and `pv2h` (Political assassinations in the community).
+
+I would guess that this is the reason for the clustering we saw in the PC1/PC2 plot -- the gap was between those responses with pv1=0 and those with pv1=1. 
 
 ```{r}
-log_data <- my_data[,c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f','pv2g','pv2h','pv2i','pv2j','pv2k')]
+log_data <- my_data[,c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f','pv2g',
+                       'pv2h','pv2i','pv2j','pv2k')]
 log_data <- log_data - 1 #convert to 0-1 scale
 p_vals <- sapply(log_data, function(x) coef(summary(glm(x ~ all_pc1$norm,family=binomial(logit))))[2,4])
 p_vals
 ```
-Coincidentally, `pv2f`and `pv2h`have also got the lowest p-values of the group.
+
+Coincidentally, `pv2f`and `pv2h`have also got the highest p-values of the group, although they are still significant.
 
 ```{r}
 pv2f <- data.frame(q=my_data$pv2f,w=all_pc1$norm)
@@ -145,4 +161,33 @@ ggplot(pv2h,aes(x=w,y=q)) +
   xlab('Composite index') +
   theme(text=element_text(size=20))
 ``` 
+
 Very low r-squared values for both variables.
+
+What happens if, instead of all this fancy PCA stuff, we just take a sum?
+
+```{r}
+pvsum <- rowSums(2 - my_data,na.rm=TRUE)
+sapply(log_data, function(x) 
+  coef(summary(glm(x ~ pvsum,family=binomial(logit))))[2,4])
+```
+
+For 9 of the 12 variables, this approach gets us a lower p-value; in the cases where they increased it wasn't by much.
+
+```{r}
+pv2f <- data.frame(q=my_data$pv2f,w=pvsum)
+pv2f <- na.omit(pv2f)
+my_lm <- lm(data=pv2f, q ~ w)
+summary(my_lm)
+ggplot(pv2f,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
+  ylab('pv2f') +
+  xlab('Simple sum') +
+  theme(text=element_text(size=20))
+```
+
+The R-squared still isn't spectacular, but it's an improvement over the PCA result.
