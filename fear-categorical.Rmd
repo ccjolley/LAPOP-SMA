@@ -1,0 +1,90 @@
+---
+title: "Fear and unordered categorical variables"
+author: "Craig Jolley"
+date: "November 19, 2015"
+output: html_document
+---
+```{r}
+library(ggplot2)
+library(mice)
+library(plyr)
+library(GGally)
+
+lapop.2014.HND <- read.csv("../2014-HND.csv")
+lapop.2014.SLV <- read.csv("../2014-SLV.csv")
+lapop.2014.GTM <- read.csv("../2014-GTM.csv")
+set.seed(12345) # for reproducibility
+
+incl <- c('vic44','fear10','vic1ext',
+         'vic1exta','vic1hogar','aoj11','pese1','pese2','aoj17','diso7',
+         'diso8','diso10','diso18','diso14','diso16','diso17','vicbar1', 
+         'vicbar1f','vicbar3','vicbar4','vicbar7')
+
+hnd_data <- lapop.2014.HND[,incl]
+slv_data <- lapop.2014.SLV[,incl]
+gtm_data <- lapop.2014.GTM[,incl]
+my_data <- rbind(gtm_data,hnd_data,slv_data)
+
+my_data$vic1exta[my_data$vic1exta == 999999] <- 0
+is.na(my_data[my_data>30]) <- TRUE
+
+my_imp <- mice(my_data, printFlag = F)
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
+all_pc1$imp1 <- -all_pc1$imp1
+all_pc1$imp4 <- -all_pc1$imp4
+all_pc1$avg <- rowMeans(all_pc1)
+all_pc1$norm <- scale(-all_pc1$avg) # sign flip -- now high values mean more fear
+```
+
+Let's see how people's level of fear correlates with their answers to `a4` -- the most serious problem facing the country. This is a little tricky, since the coding is consistent between countries (e.g. `a4=4` means poverty everywhere), but not all of the possible answers were on the questionnaire for any given country. If any country-specific answers turn out to be significant, we'll have to make sure they're significant at a country level as well.
+
+```{r}
+fear <- data.frame(w=all_pc1$norm)
+a4 <- c(lapop.2014.HND$a4,lapop.2014.SLV$a4,lapop.2014.GTM$a4)
+a4[a4==888888] <- NA
+a4[a4==988888] <- NA
+fear$a4 <- a4
+
+categ_unsorted <- function(f,x,categ) {
+  # For a data from f with a continuous variable 'x' and an unsorted 
+  # categorical variable 'categ', test whether the value of x is 
+  # significantly higher or lower for each value of categ than for the
+  # rest of the population. Do this using a two-sample t-test.
+  result <- data.frame(var=character(),val=integer(),pval=double(),
+                       mean=double(),othermean=double())
+  for(q in unique(na.omit(f[,categ]))) {
+    if(sum(f[,categ]==q,na.rm=TRUE) > 1) {
+      yes <- fear[fear[,categ]==q,x]
+      no <- fear[fear[,categ]!=q,x]
+      tt <- t.test(yes,no,na.rm=TRUE)
+      newrow <- data.frame(var=categ,val=q,pval=tt$p.value,
+                       mean=tt$estimate[[1]],
+                       othermean=tt$estimate[[2]])
+      result <- rbind(result,newrow)
+    }
+  }
+  result
+}
+
+categ_unsorted(fear,'w','a4')
+```
+
+So it looks like the only strong correlation here is that people who are concerned about human rights violations are significantly *less* fearful than the rest of the population. 
+
+Another unordered categorical variable would be `for1n` (Country with the most influence in the region).
+
+```{r}
+for1n <- c(lapop.2014.HND$for1n,lapop.2014.SLV$for1n,lapop.2014.GTM$for1n)
+for1n[for1n==888888] <- NA
+for1n[for1n==988888] <- NA
+fear$for1n <- for1n
+categ_unsorted(fear,'w','for1n')
+mean(for1n==4,na.rm=TRUE)
+mean(for1n==2,na.rm=TRUE)
+```
+
+So the 71% of people who feel that the USA (`for1n=4`) is the most influential country in the region are significantly more fearful than the remaining 29%, while the 9% who think Japan has the most influence (`for1n==2`) are less fearful than the remaining 91%. Everything else turns out not to be significant. I don't really know what makes the people who perceive a high Japanese influence different from everyone else, but it's a pretty big difference.
+
