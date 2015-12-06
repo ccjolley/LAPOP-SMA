@@ -83,7 +83,12 @@ my_imp <- mice(my_data,printFlag = F)
 my_imp
 ```
 
-None of the variables really stand out as needing a lot of imputation -- `b19` (Trust in the Superior Court of Accounts) is a little higher than others, possibly because some people don't know enough about it to know whether to trust it or not.
+Some variables stand out as needing more imputation that others:
+* `b1`: Some people chose not to talk about their opinion on whether or not Courts deliver a fair trial.
+* `b19` (Trust in the Superior Court of Accounts) is a little higher than others, possibly because some people don't know enough about it to know whether to trust it or not.
+* `b46` (Trust in National Anticorruption Council) either reflects the lack of awareness of this institution or the perception of corruption, in general. 
+* `honb51`(Trust in Commission on Human Rights) again, this may also be a reflection of the lack of awareness of a special instution such as this one, or the overall perception of how human rights are being treated in Honduras.
+* I am asserting this guess for the latter two, since there have been calls to implement a body like the CICIG in Honduras (i.e. CICIH).
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -110,7 +115,7 @@ ggpairs(all_pc1) + theme_classic()
 
 ```
 
-Beautiful distributions, high correlations (probably because not much imputation was required).
+Beautiful distributions, high correlations.
 
 ```{r}
 all_pc1$avg <- rowMeans(all_pc1)
@@ -177,6 +182,7 @@ sapply(c('b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 
 ```
+The p-values obtained are extremely small!
 
 Beautiful!
 
