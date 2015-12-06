@@ -52,7 +52,7 @@ Without imputation, 37.8% of variance is concentrated on the first principal com
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
-Thus far, not many variables seem to be needing a lot of imputation. `pv1` (witnessed an act of violence linked to the 2011 campaign) is the one variable that is missing the most amount of cells per column. Judging from the options, this may be attributed to lack of awareness or unwillingness to respond.
+Some imputation will be needed for all variables; however, compared to other indeces, the amount is not as abyssmal. `pv1` (witnessed an act of violence linked to the 2011 campaign) is the one variable that is missing the most amount of cells per column. Judging from the options, this may be attributed to lack of awareness or unwillingness to respond.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -90,7 +90,7 @@ colMeans(my_data[all_pc1$avg == min(all_pc1$avg),],na.rm=TRUE)
 colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
 ```
 
-So people with the (very common) minimum score just said "no" to everything. For those who said yes to something, it seems most often to have been `pv1` (witnessing an act of violence related to the 2011 campaign). In general, though the scale makes sense -- people who experienced political violence have higher values of the composite score. 
+So people with the (very common) minimum score just said "no" to everything. For those who said "yes" to something, it seems most often to have been `pv1` (witnessing an act of violence related to the 2011 campaign). In general, though the scale makes sense -- people who experienced political violence have higher values of the composite score. 
 
 ```{r}
 all_pc1$norm <- scale(all_pc1$avg) 
