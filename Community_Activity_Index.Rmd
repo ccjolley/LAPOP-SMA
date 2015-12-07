@@ -52,7 +52,7 @@ Without any imputation, 32.7% of variance is concentrated on the first principal
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
-None of the variables really need any imputation, EXCEPT `cp20`, which was question conditioned on the subject being male.
+None of the variables stand out as needing too much imputation, with the CLEAR exception of `cp20`, which was question conditioned on the subject being male. Presumably, what the imputation is telling us is that the individual in question is the kind of guy who would go to women's groups if men were invited.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -73,7 +73,7 @@ names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
 
-And yes! We have some great correlations.
+And yes! We have some great correlations. This may get imputed with rather high confidence, given that most people don't attend these meetings much or at all - this also is common among the most engaged, whose presence is not as frequent in these kind of meetings!
 
 ```{r}
 all_pc1$avg <- rowMeans(all_pc1)
@@ -83,7 +83,7 @@ colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
 ```
 When comparing the lower 25% quartile to the higher 75% quartile, all of the variables show that the subjects are not often engaged in these kinds of activities; in some cases, they are never present.
 
-* Some initiative in trying to solve a community problem `b5`; however, judging by the number of people that are never present, I am assuming that these meetings have some exclusivity. Not surprising!
+* Some initiative in trying to solve a community problem `cp5`; however, judging by the number of people that are never present, I am assuming that these meetings have some exclusivity. Not surprising!
 * The case above is also applicable to:
 * `cp7`: Meetings to Parent Association
 * `cp8`: Meetings to Community Improvement Association
@@ -99,7 +99,7 @@ The participation is slim to none.
 
 Note that high values of the index correspond to larger numbers, which means *less* frequent engagement. Let's reverse the index so that everything is pointing in the right direction. 
 
-It would be interesting to look more into the profile of the people that do engage in these activities.
+It would be interesting to look more into the profile of the people that do engage in these activities - particularly, the men who imputed values of 1 or 2 in women's groups meetings.
 
 ```{r}
 all_pc1$norm <- -scale(all_pc1$avg) 

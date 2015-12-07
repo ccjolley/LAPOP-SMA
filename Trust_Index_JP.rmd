@@ -83,7 +83,12 @@ my_imp <- mice(my_data,printFlag = F)
 my_imp
 ```
 
-None of the variables really stand out as needing a lot of imputation -- `b19` (Trust in the Superior Court of Accounts) is a little higher than others, possibly because some people don't know enough about it to know whether to trust it or not.
+Some variables stand out as needing more imputation that others:
+* `b1`: Some people chose not to talk about their opinion on whether or not Courts deliver a fair trial.
+* `b19` (Trust in the Superior Court of Accounts) is a little higher than others, possibly because some people don't know enough about it to know whether to trust it or not.
+* `b46` (Trust in National Anticorruption Council) either reflects the lack of awareness of this institution or the perception of corruption, in general. 
+* `honb51`(Trust in Commission on Human Rights) again, this may also be a reflection of the lack of awareness of a special instution such as this one, or the overall perception of how human rights are being treated in Honduras.
+* I am asserting this guess for the latter two, since there have been calls to implement a body like the CICIG in Honduras (i.e. CICIH).
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -110,7 +115,7 @@ ggpairs(all_pc1) + theme_classic()
 
 ```
 
-Beautiful distributions, high correlations (probably because not much imputation was required).
+Beautiful distributions, high correlations.
 
 ```{r}
 all_pc1$avg <- rowMeans(all_pc1)
@@ -127,38 +132,7 @@ colMeans(my_data[all_pc1$norm < quantile(all_pc1$norm)[2],],na.rm=TRUE)
 colMeans(my_data[all_pc1$norm > quantile(all_pc1$norm)[4],],na.rm=TRUE)
 ```
 What are we seeing now?
-**Note:** My logic is the following:
-- When comparing the higher (75%) quartile to the lower (25%) quartile, I took the interquartile range for each variable into account. The less spread out the interquartile range, the more I was driven to deduce that the trust lied somewhere in the middle (here labeled as 'some' or 'medium'); the amount of trust depended on the values of the variables on each quantile.
-
-* Lower levels of trust in courts guaranteeing fair trial (`b1`)
-* Some respect for political institutions (`b2`)
-* Lower levels of trust in government respecting basic rights (`b3`)
-* Some division in regards to pride in political system (`b4`), but overall some respect in the system
-* Some support for political system (`b6`)
-* Some division again regarding trust in judicial system (`b10a`), more trust towards it, generally speaking
-* Low to medium trust in national electoral institution (`b11`)
-* More trust in armed forces (`b12`)
-* Some trust in national legislature (`b13`)
-* Some trust in national police (`b18`)
-* Lower levels of trust for political parties
-* `b21a`(Trust in Executive) seems like a tricky one. While the 25% quartile has a value of 2.42, the higher 75% quartile has a value of 6.1 - giving it a rather spread out interquartile range. My immediate guess is that there is some level of trust for the executive, but this is a topic that divides a good amount of people.
-* Some trust in local government (`b32`)
-* Medium trust in the Media (`b37`)
-* Not much trust in the elections (`b47a`), trust is pretty low
-* Lower trust in Central Government (`b14`)
-* Lower trust in Public Ministry (`b15`)
-* Lower trust in Superior Court of Accounts(`b19`)
-* Low trust in National Anticorruption Council (`b46`)
-* Medium to low levels of trust in Human Rights Council (`honb51`)
-* Lower trust in vote being kept secret (`venb11`)
-* Lower trust in results reflecting votes (`venhonb51`)
-* Some agreement in having international observers at elections (`venhonvb10`)
-* Medium to low trust in political parties representing voters well (`epp1`)
-* Low confidence in political parties listening to voters (`epp3`)
-* Some confidence in Administration's handling of corruption (`n9`)
-* Some confidence in Administration's handling of citizen security (`n11`)
-* Some confidence in Administration's handling of economy (`n15`)
-* Some trust in military respecting Human Rights (`b3milx`)
+As noted, in previous discussions, the main takeaway here is that all of the numbers are bigger for high values of the index than for low ones. Thus far, we are in good shape!
 
 
 
@@ -208,6 +182,7 @@ sapply(c('b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 
 ```
+The p-values obtained are extremely small!
 
 Beautiful!
 
@@ -269,9 +244,9 @@ my_data <- lapop.2014.SLV[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13','
 * `epp3`: Political Parties Listen to Voters (1=Not at all, 7=A lot)
 * `b3milx`: Armed Forces Respect Human Rights (1=Not at all, 7=A lot)
 * `pr4`: Government Respects Private Property (1=Not at all, 7=A lot)
-* `epn3a`: Central Governement Represents Your Interests (1=Not at all, 7=A lot)
-* `epn3b`: Legislative Representative Represents Your Interests (1=Not at all, 7=A lot)
-* `epn3c`: Mayor and City Council Represent Your Interests (1=Not at all, 7=A lot)
+* `epn3a`: Central Governement Represents Your Interests (1=A lot, 4=Not at all)
+* `epn3b`: Legislative Representative Represents Your Interests (1=A lot, 4=Not at all)
+* `epn3c`: Mayor and City Council Represent Your Interests (1=A lot, 4=Not at all)
 
 As is to be expected with a LAPOP study, there are questions that were adapted to reflect the national reality of a country. Here we have examples of a few variables that we did not see for Honduras, but that were selected for this proposed Trust Index for El Salvador:
 * `esb48` - which presents an institution particular to El Salvador's civil and political structure
@@ -292,24 +267,24 @@ Around 1% of missing values.
 
 ```{r}
 my_complete <- na.omit(my_data)
-pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=TRUE)
 plot(pr_complete)
 summary(pr_complete)
 ```
-Without any imputation, 39.7% of my variance is concentrated in my first principle component.
+Without any imputation, about 37% of my variance is concentrated in my first principle component.
 
 ```{r}
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
-None of the variables seem to be needing any imputation, with the exception of,perhaps, `esb48`. Again, it is most likely that the Institute of Access to Public Information is not that well-known.
+None of the variables seems to stand out as needing much imputation, with the exception of,perhaps, `esb48`. Again, it is most likely that the Institute of Access to Public Information is not that well-known.
 
 ```{r}
-pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=TRUE,center=TRUE))
 plot(pr[[1]])
 summary(pr[[1]])
 ```
-Following the imputation, not much has changed. 39.5% of variance is concentrated on the first principle component.
+Following the imputation, not much has changed. 36.75% of variance is concentrated on the first principle component.
 
 ```{r}
 pc1 <- pr[[1]]$x[,1]
@@ -355,8 +330,8 @@ A few interesting things to take home, when comparing the higher (75%) quantile 
 * Some trust in Amrmed Forces respecting Human Rights (`b3milx`)
 * Some trust in Government respecting private property (`pr4`)
 
-Now this is where it gets interesting!
-When comparing the values on the higher (75%) quantile to the lower (25%) quantile, the values were lower for: `epn3a`, `epn3b`and `epn3c`. When I looked at the sum of people that responded 5 or higher, on the confidence scale, R-Studio gave me the amount of 0. In all, it seems that no one responded 5 or higher on these three questions!
+**Note:**
+When comparing the values on the higher (75%) quantile to the lower (25%) quantile, the values were lower for: `epn3a`, `epn3b`and `epn3c`. As discussed, this should be normal since the scale for this questions is from 1-4, with 1 meaning a lot and 4 meaning not at all. If my lecture of this comparison is correct, then there doesn't seem to be much trust in these institutions. Let us see how we can reflect the difference in scales in the next step. 
 
 ```{r}
 all_pc1$norm <- scale(all_pc1$avg) 
@@ -388,7 +363,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
-All variables seem to have a big influence on the index, with the exception of `epn3a`, `epn3b`and `epn3c`, which have a negative influence.
+The influence of all variables on the score is very considerable.
 
 Now onto a calculation of p-values, we see that-
 
@@ -404,7 +379,7 @@ sapply(c('b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
                              'b18','b21','b21a','b32', 'b47a','esb48','n9','n11','n15', 'epp1', 'epp3', 'b3milx', 'pr4', 'epn3a', 'epn3b','epn3c'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
-Both `epn3b`and `epn3c`have low values, such is not the case for `epn3a`. 
+- all of the variables have epically small numbers, and should therefore be considered.
 
 ```{r}
 epn3c <- data.frame(q=my_data$epn3c,w=all_pc1$norm)
@@ -438,81 +413,6 @@ ggplot(epn3a,aes(x=w,y=q)) +
   xlab('Composite index') +
   theme(text=element_text(size=20))
 ```
-Hmm...the r-squared value of `epn3a`is to be considered. For now, I will eliminate both `epn3b`and `epn3c`.
-
-```{r}
-my_data2 <- lapop.2014.SLV[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13','b18','b21','b21a','b32', 'b47a','esb48','n9','n11','n15','epp1','epp3','b3milx','pr4','epn3a')]
-```
-
-```{r}
-is.na(my_data2[my_data2>16]) <- TRUE
-my_complete2 <- na.omit(my_data2)
-pr_complete2 <- prcomp(my_complete2,center=TRUE,scale=FALSE)
-plot(pr_complete2)
-summary(pr_complete2)
-```
-40.5% of variance is already concentrated on the first principal component.
-
-```{r}
-my_imp2 <- mice(my_data2,printFlag = F) 
-pr2 <- lapply(1:5,function(x) prcomp(complete(my_imp2,x),scale=FALSE,center=TRUE))
-plot(pr2[[1]]) 
-summary(pr2[[1]])
-```
-Following the imputation, 40% of the variance in concentrated on the first principal component. So, not much has changed.
-
-```{r}
-all_pc2 <- data.frame(llply(1:5, function(i) pr2[[i]]$x[,1]))
-names(all_pc2) <- c('imp1','imp2','imp3','imp4','imp5')
-ggpairs(all_pc2) + theme_classic()
-```
-The correlations are VERY strong here.
-
-```{r}
-all_pc2$avg <- rowMeans(all_pc2)
-all_pc2$norm <- scale(all_pc2$avg)
-colMeans(my_data2[all_pc2$norm < quantile(all_pc2$norm)[2],],na.rm=TRUE)
-colMeans(my_data2[all_pc2$norm > quantile(all_pc2$norm)[4],],na.rm=TRUE)
-```
-Not much increase in the values here.
-
-```{r}
-sapply(c('b1','b2','b3','b4','b10a','b11','b12','b13','b18','b21','b21a','b32','b47a','esb48','n9','n11','n15', 'epp1', 'epp3', 'b3milx', 'pr4', 'epn3a'),
- function(x) lmp(lm(all_pc2$norm ~ my_data[,x])))
-```
-Beautiful.
-
-```{r}
-b2 <- data.frame(q=my_data2$b2,w=all_pc2$norm)
-b2 <- na.omit(b2)
-my_lm <- lm(data=b2, q ~ w)
-summary(my_lm)
-ggplot(b2,aes(x=w,y=q)) +
-  geom_jitter(color='tomato3',size=5,alpha=0.2) +
-  theme_classic() +
-  geom_smooth(method='lm',size=2,color='royalblue') +
-  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
-           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
-  ylab('b2') +
-  xlab('Composite index') +
-  theme(text=element_text(size=20)) 
-```
-
-```{r}
-epn3a <- data.frame(q=my_data2$epn3a,w=all_pc2$norm)
-epn3a <- na.omit(epn3a)
-my_lm <- lm(data=epn3a, q ~ w)
-summary(my_lm)
-ggplot(b2,aes(x=w,y=q)) +
-  geom_jitter(color='tomato3',size=5,alpha=0.2) +
-  theme_classic() +
-  geom_smooth(method='lm',size=2,color='royalblue') +
-  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
-           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
-  ylab('epn3a') +
-  xlab('Composite index') +
-  theme(text=element_text(size=20)) 
-```
 
 Finally, we move on to Guatemala!
 
@@ -536,7 +436,7 @@ The amount of variables that we will be examining for this proposed index are no
 * `n15`: Evaluation of Administration's Handling of Economy (1=Not at all, 7=A lot)
 * `b3milx`: Armed Forces Respect Human Rights (1=Not at all, 7=A lot)
 * `pr4`: Government Respects Private Property (1=Not at all, 7=A lot)
-* `m1`: Presidential Job Performance (1=Not at all, 7=A lot)
+* `m1`: Presidential Job Performance (1=Very Good, 5=Very Bad)
 
 
 ```{r}
@@ -621,7 +521,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
-All variables demonstrate a high amount of influence in the index, with the exception of `m1`, which goes in a negative direction. Not really shocking considering the low scores that were attributed to this question. Onto calculating p-values!
+All variables seem to have a significant impact on the score - with the exception of `m1`, which seems to have a more modest impact. Onto calculating p-values!
 
 ```{r}
 lmp <- function (modelobject) {
@@ -668,7 +568,7 @@ ggplot(b2,aes(x=w,y=q)) +
   xlab('Composite index') +
   theme(text=element_text(size=20))
 ```
-Having the lowest p-values, R-squared values for both `b2`and `m1`are the same.
+Having the more modest p-values in the index, R-squared values for both `b2`and `m1`are the same.
 
 So, to conclude, the following are the variables to be taken into account for a comparative trust index between the nations of the Northern Triangle.
 
