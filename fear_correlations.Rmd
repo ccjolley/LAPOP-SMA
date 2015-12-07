@@ -13,6 +13,7 @@ library(mice)
 library(plyr)
 library(ggplot2)
 library(GGally)
+set.seed(12345)
 ```
 
 ```{r}
@@ -99,7 +100,7 @@ pvalue(fear_hnd, lapop.2014.HND, 'np1')
 pvalue(fear_hnd, lapop.2014.HND, 'np2')
 pvalue(fear_hnd, lapop.2014.HND, 'prot3') #people who have not participated in a protest are less fearful 
 pvalue(fear_hnd, lapop.2014.HND, 'prot7')
-pvalue(fear_hnd, lapop.2014.HND, 'vb2') #people who did not vote are more fearful 
+pvalue(fear_hnd, lapop.2014.HND, 'vb2') # voters are less fearful
 pvalue(fear_hnd, lapop.2014.HND, 'vb10')
 pvalue(fear_hnd, lapop.2014.HND, 'wf1')
 pvalue(fear_hnd, lapop.2014.HND, 'cct1b')
