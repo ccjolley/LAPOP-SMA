@@ -168,7 +168,7 @@ hnd_bin <- c('vb2','q10a','q14','ur','sexi','prot3')
 for (x in hnd_bin) {
   for (y in hnd_bin[-1:-which(hnd_bin==x)]) {
     res <- bin_bin(lapop.2014.HND,x,y)
-    if (res[1] < 0.05) {
+    if (res[1] < 0.01) {
       print(paste(x,y,res[1],res[2]))
     }
   }
@@ -182,11 +182,55 @@ So there are negative relationships between:
 
 And positive relationships between:
 
-* `vb2` and `prot3`: Voters more likely to protest
 * `q10a` and `q14`: Remittance receivers more likely to plan to leave
 * `q10a` and `ur`: Remittance receivers more urban
-* `q10a` and `prot3`: Remittance receivers more likely to protest
 * `q14` and `ur`: Urban people more likely to leave
+
+Now, correlate binary and continuous variables:
+
+```{r}
+bin_cont <- function(data,bvar,cvar) {
+  b <- data[data[,bvar] < 1000 & data[,cvar] < 1000,bvar]
+  b <- b - min(b) # convert to 0-1 scale
+  c <- data[data[,bvar] < 1000 & data[,cvar] < 1000,cvar]  
+  tt <- t.test(c[b==0],c[b==1])
+  c(tt$p.value,tt$estimate[2]-tt$estimate[1])
+}
+hnd_cont <- c('ed','for6','pol1','per4','sd3new2','mil1','aoj12','q12','ico2',
+              'pole2n','eff1','ing4')
+for (x in hnd_bin) {
+  for (y in hnd_cont) {
+    res <- bin_cont(lapop.2014.HND,x,y)
+    if (res[1] < 0.01) {
+      print(paste(x,y,res[1],res[2]))
+    }
+  }
+}
+```
+
+Negative correlations:
+
+* `vb2` and `q12`: Voters have more children
+* `q10a` and `ed`: Educated people receive more remittances
+* `q14` and `ed`: Educated people plan to leave
+* `q14` and `sd3new2`: People more dissatisfied with schools plan to leave
+* `ur` and `ed`: Urban people more educated
+* `ur` and `per4`: Urban people have anxious personalities
+* `ur` and `aoj12`: Urban people less confident that guilty are punished
+* `sexi` and `for6`: People with male interviewers find China more influential
+
+Positive correlations:
+
+* `vb2` and `pol1`: Voters more interested in politics
+* `prot3` and `pol1`: Protesters more interested in politics
+* `q14` and `pol1`: People interested in politics plan to leave
+* `q14` and `q12`: People with fewer children plan to leave
+* `ur` and `for6`: Urban people consider China more influential
+* `ur` and `q12`: Urban people have fewer children
+* `ur` and `ico2`: More National Police patrols in urban neighborhoods
+* `sexi` and `aoj12`: People with male interviewers more convinced that guilty are punished
+
+
 
 ### GUATEMALA ####
 ```{r}
