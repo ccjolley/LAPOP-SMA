@@ -72,15 +72,26 @@ all_pc1_slv$avg <- rowMeans(all_pc1_slv)
 
 all_pc1_hnd$norm <- scale(-all_pc1_hnd$avg) # sign flip -- now high values mean more fear
 all_pc1_gtm$norm <- scale(-all_pc1_gtm$avg) # sign flip -- now high values mean more fear
-all_pc1_slv$norm <- scale(-all_pc1_slv$avg) # sign flip -- now high values mean more fear
+all_pc1_slv$norm <- scale(all_pc1_slv$avg) # no sign flip needed
 
 fear_hnd <- data.frame(w=all_pc1_hnd$norm)
 fear_gtm <- data.frame(w=all_pc1_gtm$norm)
 fear_slv <- data.frame(w=all_pc1_slv$norm)
 
-fear_hnd = as.numeric(unlist(fear_hnd))
+fear_hnd = as.numeric(unlist(fear_hnd)) 
 fear_gtm = as.numeric(unlist(fear_gtm))
 fear_slv = as.numeric(unlist(fear_slv))
+```
+
+Before going further, let's do some quick sanity checks to make sure things are pointing in the right direction.
+
+```{r}
+mean(fear_hnd[lapop.2014.HND$vic1ext==1]) # 0.52
+mean(fear_hnd[lapop.2014.HND$vic1ext==2]) # -0.12 Honduran non-victims less fearful
+mean(fear_slv[lapop.2014.SLV$vic1ext==1]) # 0.51
+mean(fear_slv[lapop.2014.SLV$vic1ext==2]) # -0.12 Salvadoran non-victims less fearful
+mean(fear_gtm[lapop.2014.GTM$vic1ext==1]) # 0.58
+mean(fear_gtm[lapop.2014.GTM$vic1ext==2]) # -0.12 Guatemalan non-victims less fearful
 ```
 
 #### HONDURAS #### 
@@ -142,6 +153,40 @@ pvalue(fear_hnd, lapop.2014.HND, 'q12c')
 pvalue(fear_hnd, lapop.2014.HND, 'q12bn')
 pvalue(fear_hnd, lapop.2014.HND, 'q12') #those with more children are less fearful 
 ```
+
+Now we should look at which of the variables that correlate with our fear index also correlate with each other.
+
+```{r}
+bin_bin <- function(data,var1,var2) {
+  v1 <- data[data[,var1] < 1000 & data[,var2] < 1000,var1]
+  v2 <- data[data[,var1] < 1000 & data[,var2] < 1000,var2]
+  ct <- table(v1,v2)
+  ft <- fisher.test(ct)
+  c(ft$p.value,ft$estimate)
+}
+hnd_bin <- c('vb2','q10a','q14','ur','sexi','prot3')
+for (x in hnd_bin) {
+  for (y in hnd_bin[-1:-which(hnd_bin==x)]) {
+    res <- bin_bin(lapop.2014.HND,x,y)
+    if (res[1] < 0.05) {
+      print(paste(x,y,res[1],res[2]))
+    }
+  }
+}
+```
+
+So there are negative relationships between:
+
+* `vb2` and `q14`: Voters less likely to plan to leave 
+* `ur` and `sexi`: More female interviewers in urban areas
+
+And positive relationships between:
+
+* `vb2` and `prot3`: Voters more likely to protest
+* `q10a` and `q14`: Remittance receivers more likely to plan to leave
+* `q10a` and `ur`: Remittance receivers more urban
+* `q10a` and `prot3`: Remittance receivers more likely to protest
+* `q14` and `ur`: Urban people more likely to leave
 
 ### GUATEMALA ####
 ```{r}
