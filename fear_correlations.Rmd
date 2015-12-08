@@ -5,9 +5,9 @@ date: "November 29, 2015"
 output: html_document
 ---
 ```{r}
-lapop.2014.HND <- read.csv("../HND-2014.csv")
-lapop.2014.GTM <- read.csv("../GTM-2014.csv")
-lapop.2014.SLV <- read.csv("../SLV-2014.csv")
+lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
 
 library(mice)
 library(plyr)
@@ -285,6 +285,31 @@ Positive correlations:
 * `eff1` and `ing4`: People who think their leaders don't care disapprove of democracy
 
 This seems to point to a coherent set of beliefs -- high levels of trust in the military, police, schools, and political leaders all seem to go together.
+
+Now this can really get interesting -- we're prepared to look at multiple regressions. The goal here is to *invalidate* correlations; we want to rule out as many as we can. 
+
+Let's start with an easy one: I really don't believe that people are afraid of crime because they think China is influential. Perception of Chinese influence (`for6`) correlates with urbanization (`ur`), education (`ed`), preference for democracy (`ing4`), and having a male interviewer (`sexi`).
+
+```{r}
+hnd <- lapop.2014.HND
+hnd[hnd > 30] <- NA
+summary(lm(fear_hnd ~ hnd$for6 + hnd$ur))
+```
+
+So, when we take urbanization into account, China-watchers are no more afraid of crime than other people at the same level of urbanization.
+
+What if we just toss in everything?
+
+```{r}
+summary(lm(fear_hnd ~ hnd$ur + hnd$vb2 + hnd$q10a + hnd$q14 + hnd$sexi + 
+             hnd$prot3 + hnd$ed + hnd$for6 + hnd$pol1 + hnd$per4 + 
+             hnd$sd3new2 + hnd$mil1 + hnd$aoj12 + hnd$q12 + hnd$ico2 + 
+             hnd$pole2n +hnd$eff1 + hnd$ing4))
+```
+
+With a strict (p < 0.01) criterion, the only significant correlations left are urbanization, male interviewers, anxious personalities, dissatisfaction with schools, infrequent National Police patrols, and dissatisfaction with police.
+
+In hindsight, it probably wasn't necessary to calculate all of those pairwise correlations, because adding all of them tells us what we really needed to know -- which variables really have an impact on our fear index.
 
 ### GUATEMALA ####
 ```{r}
