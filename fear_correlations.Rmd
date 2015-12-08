@@ -230,7 +230,61 @@ Positive correlations:
 * `ur` and `ico2`: More National Police patrols in urban neighborhoods
 * `sexi` and `aoj12`: People with male interviewers more convinced that guilty are punished
 
+Finally, let's correlate the continuous variables with each other:
 
+```{r}
+cont_cont <- function(data,var1,var2) {
+  v1 <- data[data[,var1] < 1000 & data[,var2] < 1000,var1]
+  v2 <- data[data[,var1] < 1000 & data[,var2] < 1000,var2]
+  reg <- lm(v1~v2)
+  summary(reg)$coefficients[2,c(1,4)]
+}
+for (x in hnd_cont) {
+  for (y in hnd_cont[-1:-which(hnd_cont==x)]) {
+    res <- cont_cont(lapop.2014.HND,x,y)
+    if (res[2] < 0.01) {
+      print(paste(x,y,res[2],res[1]))
+    }
+  }
+}
+```
+
+Negative correlations:
+
+* `ed` and `for6`: Educated people find China more influential
+* `ed` and `pol`: Educated people more interested in politics
+* `ed` and `q12`: Educated people have fewer children
+* `ed` and `ico2`: Educated people get more National Police patrols
+* `for6` and `ing4`: People who see Chinese influence prefer democracy
+* `pol1` and `mil1`: People interested in politics have a higher opinion of military
+* `pol1` and `eff1`: People interested in politics think leaders are interested
+* `sd3new2` and `mil1`: People satisfied with schools have a high opinion of military
+* `sd3new2` and `eff1`: People satisfied with schools think leaders are interested
+* `sd3new2` and `ing4`: People satisfied with schools like democracy
+* `mil1` and `aoj12`: People with a high opinion of the military also trust the judiciary
+* `mil1` and `ico2`: People with lots of National Police patrols think highly of the military
+* `mil1` and `pole2n`: People who love the police also love the military
+* `aoj12` and `eff1`: People who think their leaders care also believe the guilty are punished
+* `ico2` and `ing4`: People with lots of National Police patrols prefer democracy
+* `pole2n` and `eff1`: People who think their leaders care like the police
+* `pole2n` and `ing4`: People who like the police like democracy
+
+Positive correlations:
+
+* `ed` and `aoj12`: More educated people don't think the guilty are punished
+* `pol1` and `aoj12`: People interested in politics do think the guilty are punished
+* `per4` and `pole2n`: Anxious people dislike the police
+* `sd3new2` and `aoj12`: People who are satisfied with schools also think the guilty are punished
+* `sd3new2` and `ico2`: People who get lots of National Police patrols are satisfied with schools
+* `sd3new2` and `pole2n`: People who like the schools like the cops
+* `mil1` and `eff1`: People who think their leaders care also think highly of the military
+* `mil1` and `ing4`: People who think highly of the military also like democracy
+* `aoj12` and `ico2`: People who get lots of National Police patrols think the guilty are punished
+* `aoj12` and `pole2n`: People who think the guilty are punished like the police
+* `ico2` and `pole2n`: People who get lots of police patrols love the police
+* `eff1` and `ing4`: People who think their leaders don't care disapprove of democracy
+
+This seems to point to a coherent set of beliefs -- high levels of trust in the military, police, schools, and political leaders all seem to go together.
 
 ### GUATEMALA ####
 ```{r}
