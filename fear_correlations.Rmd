@@ -11,8 +11,6 @@ lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
 
 library(mice)
 library(plyr)
-library(ggplot2)
-library(GGally)
 set.seed(12345)
 ```
 

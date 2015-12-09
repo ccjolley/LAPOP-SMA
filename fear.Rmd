@@ -219,7 +219,7 @@ lm_data <- my_data[,c('fear6f','vic1exta','aoj11','aoj17','pese1','pese2',
                       'diso7','diso8','diso10','diso14','diso16','diso17',
                       'diso18','vicbar3')]
 p_vals <- sapply(lm_data, function(x) lmp(lm(x ~ all_pc1$norm)))
-p-values for binary variables
+#p-values for binary variables
 
 log_data <- my_data[,c('vic40','vic41','vic43','vic1ext','vic1hogar',
                        'vicbar1','vicbar3','vicbar4','vicbar7')]
