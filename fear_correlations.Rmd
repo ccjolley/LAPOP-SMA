@@ -292,7 +292,8 @@ Let's start with an easy one: I really don't believe that people are afraid of c
 
 ```{r}
 hnd <- lapop.2014.HND
-hnd[hnd > 30] <- NA
+hnd[hnd > 5000] <- NA
+hnd$fear_idx <- fear_hnd
 summary(lm(fear_hnd ~ hnd$for6 + hnd$ur))
 ```
 
@@ -309,7 +310,101 @@ summary(lm(fear_hnd ~ hnd$ur + hnd$vb2 + hnd$q10a + hnd$q14 + hnd$sexi +
 
 With a strict (p < 0.01) criterion, the only significant correlations left are urbanization, male interviewers, anxious personalities, dissatisfaction with schools, infrequent National Police patrols, and dissatisfaction with police.
 
-In hindsight, it probably wasn't necessary to calculate all of those pairwise correlations, because adding all of them tells us what we really needed to know -- which variables really have an impact on our fear index.
+In hindsight, it probably wasn't necessary to calculate all of those pairwise correlations, because adding all of them tells us what we really needed to know -- which variables really have an impact on our fear index. Of course there's a risk in adding too many variables -- whenever a variable has `NA` values, those responses get omitted from the multiple regression. With too many variables we'll end up throwing away too much data.
+
+```{r}
+nrow(na.omit(hnd[,c(hnd_bin,hnd_cont)])) / nrow(hnd)
+```
+
+We've still got about 75% of our data included in that multiple regression.
+
+While we're at it, let's look at unordered categorical variables:
+
+```{r}
+categ <- function(f,x,categ) {
+  # For a data from f with a continuous variable 'x' and an unordered 
+  # categorical variable 'categ', test whether the value of x is 
+  # significantly higher or lower for each value of categ than for the
+  # rest of the population. Do this using a two-sample t-test.
+  result <- data.frame(var=character(),val=integer(),pval=double(),
+                       mean=double(),othermean=double())
+  for(q in unique(na.omit(f[,categ]))) {
+    if(sum(f[,categ]==q,na.rm=TRUE) > 1) {
+      yes <- f[f[,categ]==q,x]
+      no <- f[f[,categ]!=q,x]
+      if (sum(!is.na(no)) < 2) return()
+      tt <- t.test(yes,no,na.rm=TRUE)
+      if (tt$p.value < 0.01) {
+        newrow <- data.frame(var=categ,val=q,pval=tt$p.value,
+                         mean=tt$estimate[[1]],
+                         othermean=tt$estimate[[2]])
+        result <- rbind(result,newrow)
+      }
+    }
+  }
+  result
+}
+unordered_vars <- c('a4','vic2','vic2aa','vb3n','vb4new','vb101','vb11',
+                    'for1n','for4','for5','q3c','ocup4a','ocup1a','q11n',
+                    'etid','leng1')
+categ(hnd,'fear_idx','a4') # people who complain about health services are less afraid
+categ(hnd,'fear_idx','vic2') # nothing significant
+categ(hnd,'fear_idx','vic2aa') # people who were victimized away from home are less afraid than other victims
+categ(hnd,'fear_idx','vb3n') # JOH voters less fearful, Nasralla voters more fearful
+categ(hnd,'fear_idx','vb4new') # Nothing significant
+categ(hnd,'fear_idx','vb101') # Nada
+categ(hnd,'fear_idx','vb11') # Partido Anti Corrupcion (Nasralla's) voters more fearful
+categ(hnd,'fear_idx','for1n') # nada
+categ(hnd,'fear_idx','for4') # nada
+categ(hnd,'fear_idx','for5') # nada
+categ(hnd,'fear_idx','q3c') # Catholics less fearful, traditional/Native much less fearful
+categ(hnd,'fear_idx','ocup4a') # job seekers more fearful
+categ(hnd,'fear_idx','ocup1a') # self-employed less fearful, salaried more fearful
+categ(hnd,'fear_idx','q11n') # married people less fearful
+categ(hnd,'fear_idx','etid') # nothing
+categ(hnd,'fear_idx','leng1') # nothing
+
+hnd$a4_22 <- as.numeric(hnd$a4==22)
+hnd$vic2aa_4 <- as.numeric(hnd$vic2aa==4)
+hnd$vb3n_401 <- as.numeric(hnd$vb3n==401)
+hnd$vb3n_404 <- as.numeric(hnd$vb3n==404)
+hnd$vb11_407 <- as.numeric(hnd$vb11==407)
+hnd$q3c_1 <- as.numeric(hnd$q3c==1)
+hnd$q3c_7 <- as.numeric(hnd$q3c==7)
+hnd$ocup4a_3 <- as.numeric(hnd$ocup4a==3)
+hnd$ocup1a_4 <- as.numeric(hnd$ocup1a==4)
+hnd$ocup1a_2 <- as.numeric(hnd$ocup1a==2)
+hnd$ocup1a_1 <- as.numeric(hnd$ocup1a==1)
+hnd$q11n_2 <- as.numeric(hnd$q11n==2)
+
+cat_var <- c('a4_22','vic2aa_4','vb3n_401','vb3n_404','vb11_407',
+             'q3c_1','q3c_7','ocup4a_3','ocup1a_4','ocup1a_2',
+             'ocup1a_1','q11n_2')
+
+for (x in cat_var) {
+  s <- lm(fear_hnd ~ hnd$ur + hnd$vb2 + hnd$q10a + hnd$q14 + hnd$sexi + 
+             hnd$prot3 + hnd$ed + hnd$for6 + hnd$pol1 + hnd$per4 + 
+             hnd$sd3new2 + hnd$mil1 + hnd$aoj12 + hnd$q12 + hnd$ico2 + 
+             hnd$pole2n +hnd$eff1 + hnd$ing4 + hnd[,x])
+  res <- summary(s)$coefficient[nrow(summary(s)$coefficient),c(4,1)]
+  if (res[1] < 0.01) {
+    print(paste(c(x,res)))
+  }
+}
+```
+
+With a parsimonious p < 0.01, only `vic2aa_4` is significant. At the p < 0.05 level, `ocup4a_3==3` (job seekers) and `vb11==407` (Anti-corruption party (PAC) adherents) also look interesting.
+
+```{r}
+summary(lm(fear_hnd ~ hnd$ur + hnd$vb2 + hnd$q10a + hnd$q14 + hnd$sexi + 
+             hnd$prot3 + hnd$ed + hnd$for6 + hnd$pol1 + hnd$per4 + 
+             hnd$sd3new2 + hnd$mil1 + hnd$aoj12 + hnd$q12 + hnd$ico2 + 
+             hnd$pole2n +hnd$eff1 + hnd$ing4 + hnd$vic2aa_4))
+```
+
+Because `vic2aa_4` has `NA` values for all respondents who *weren't* victims in the last 12 months, it ruins most of my other correlations. We do see, however, that out of the population of self-identified victims, those with male interviewers are significantly more fearful.
+
+Looking forward to the social media analyses, it seems that frustration with schools and police, urbanization, anxiety, unemployment, and PAC support could be interesting avenues to explore.
 
 ### GUATEMALA ####
 ```{r}
