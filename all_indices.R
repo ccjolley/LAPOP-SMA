@@ -86,6 +86,10 @@ ca_hnd <- make_idx(lapop.2014.HND,
 # Sanity check: cp7==1 often attends meetings of parents' asssociation
 sanity_check(lapop.2014.HND,ca_hnd,'cp7') # Agrees with Jorge's results
 
+summary(lm(fear_hnd ~ ca_hnd))
+# Borderline signficance (p = 0.0367), with a very small positive coefficient.
+# Looks like very-engaged people are slightly more fearful?
+
 ###############################################################################
 ## Political violence Index (Guatemala only)
 ###############################################################################
@@ -97,6 +101,8 @@ pv_data <- lapop.2014.GTM[,c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f',
                              'pv2g','pv2h','pv2i','pv2j','pv2k')]
 is.na(pv_data[pv_data>800000]) <- TRUE
 pv_gtm <- rowSums(2 - pv_data,na.rm=TRUE)
+summary(lm(fear_gtm ~ pv_gtm))
+# Massively significant correlation, not suprisingly
 
 ###############################################################################
 ## Extorsion Index 
@@ -109,6 +115,9 @@ ex_data <- lapop.2014.all[,c('exc2','exc6','exc20','exc11','exc13','exc14',
                               'exc15','exc16','exc7')]
 is.na(ex_data[ex_data>800000]) <- TRUE
 ex_all <- rowSums(ex_data,na.rm=TRUE)
+
+summary(lm(fear_all ~ ex_all))
+# no significant correlation
 
 ###############################################################################
 ## Trust in government index
@@ -135,6 +144,11 @@ qplot(tr_gtm,tr_all[lapop.2014.all$pais==2]) + theme_classic()
 qplot(tr_slv,tr_all[lapop.2014.all$pais==3]) + theme_classic()
 qplot(tr_hnd,tr_all[lapop.2014.all$pais==4]) + theme_classic()
 
+summary(lm(fear_hnd ~ tr_hnd)) # very significant
+summary(lm(fear_gtm ~ tr_gtm)) # also
+summary(lm(fear_slv ~ tr_slv)) # also
+summary(lm(fear_all ~ tr_all)) # even more so
+
 ###############################################################################
 ## Wealth index (double-check GTM and SLV)
 ###############################################################################
@@ -152,6 +166,86 @@ sanity_check(lapop.2014.SLV,w_slv,'q10new') # 2.917614, 14.167665
 sanity_check(lapop.2014.HND,w_hnd,'q10new') # 1.304582, 12.397222
 sanity_check(lapop.2014.all,w_all,'q10new') # 1.75046, 13.17888
 
+summary(lm(fear_all ~ w_all)) # very significant; wealthy are more fearful
+
 ###############################################################################
-## Authoritarianism indices -- need to look at Rmd again.
+## Authoritarianism indices 
 ###############################################################################
+
+# Sympathy with gov critics
+crit_common <- c('d1','d2','d3','d4','e3','e5','e15','e16') 
+crit_all <- make_idx(lapop.2014.all,crit_common)
+crit_hnd <- make_idx(lapop.2014.HND,crit_common)
+# Sanity check: d1==1 means disapproval of critics' right to vote
+sanity_check(lapop.2014.HND,crit_hnd,'d1') # 2.665796, 8.196335
+sanity_check(lapop.2014.all,crit_all,'d1') # 2.382940, 7.657143
+
+summary(lm(fear_all ~ crit_all)) # significant; fearful people more sympathetic
+
+# Authoritarianism
+# dem2 has a strange scale; switch 1 and 2
+aut_hnd_data <- lapop.2014.HND[c('dem2','dem11','aut1','jc13','jc10','jc15a',
+                                 'jc16a','honjc17')]
+
+aut_hnd_data$dem2[aut_hnd_data$dem2==1] <- 100
+aut_hnd_data$dem2[aut_hnd_data$dem2==2] <- 1
+aut_hnd_data$dem2[aut_hnd_data$dem2==100] <- 2
+aut_hnd <- make_idx(aut_hnd_data,names(aut_hnd_data),sgn=-1)
+# Sanity check: Now, dem2==1 means democracy is preferable to all others
+sanity_check(aut_hnd_data,aut_hnd,'dem2')
+summary(lm(fear_hnd ~ aut_hnd)) # very significant and positive
+
+###############################################################################
+## Multiple regression
+###############################################################################
+
+# These were highly significant in the Honduras multiple regression
+sig_hnd <- lapop.2014.HND[,c('ur','sexi','per4','sd3new2','ico2','pole2n')]
+is.na(sig_hnd[sig_hnd > 800000]) <- TRUE
+
+summary(lm(fear_hnd ~ sig_hnd$ur + sig_hnd$sexi + 
+             sig_hnd$per4 + sig_hnd$sd3new2 + sig_hnd$ico2 + sig_hnd$pole2n))
+# Actually, per4 is less significant here than it was (in fear_correlations.Rmd)
+# when I included more variables.
+
+summary(lm(fear_hnd ~ sig_hnd$ur + sig_hnd$sexi + 
+             sig_hnd$sd3new2 + sig_hnd$ico2 + sig_hnd$pole2n))
+# All highly significant (especially ur)
+
+summary(lm(fear_hnd ~ tr_hnd + w_hnd + crit_hnd + aut_hnd + sig_hnd$ur + 
+             sig_hnd$sexi + sig_hnd$sd3new2 + sig_hnd$ico2 + sig_hnd$pole2n))
+# Trust in government and authoritarianism are still significant when we 
+# control for everything else we were looking at; wealth less so, sympathy 
+# with critics is gone completely.
+summary(lm(fear_hnd ~ tr_hnd + aut_hnd + sig_hnd$ur + 
+             sig_hnd$sexi + sig_hnd$sd3new2 + sig_hnd$ico2 + sig_hnd$pole2n))
+
+
+# What happened to wealth?
+
+summary(lm(w_hnd ~ sig_hnd$ur)) # urban people significantly more wealthy
+summary(lm(w_hnd ~ sig_hnd$ur + sig_hnd$sexi + 
+             sig_hnd$sd3new2 + sig_hnd$ico2 + sig_hnd$pole2n)) 
+# Wealthy people also unimpressed by police, much more likely to get female 
+# interviewers (Did they send men to the bad neighborhoods?)
+summary(lm(fear_hnd ~ w_hnd))
+summary(lm(fear_hnd ~ w_hnd + sig_hnd$ur)) # urbanization destroys the wealth-fear correlation
+summary(lm(fear_hnd ~ w_hnd + sig_hnd$sexi)) # wealth hurts the interviewer-sex correlation
+summary(lm(fear_hnd ~ w_hnd + sig_hnd$sexi + sig_hnd$ur)) # wealth doesn't matter
+summary(lm(fear_hnd ~ tr_hnd + w_hnd + crit_hnd + aut_hnd + sig_hnd$ur + 
+             sig_hnd$sd3new2 + sig_hnd$ico2 + sig_hnd$pole2n)) 
+# so actually wealth matters when we take interviewer sex out of it!
+
+# What happened to sympathy with critics?
+
+summary(lm(crit_hnd ~ sig_hnd$ur)) # urban people less sympathetic
+summary(lm(fear_hnd ~ crit_hnd + sig_hnd$ur)) # no more correlation
+
+
+
+
+
+
+
+
+
