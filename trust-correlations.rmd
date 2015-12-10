@@ -1,0 +1,160 @@
+The following takes the exercise from fear_correlations.rmd and applies it to our Trust Index. 
+
+```{r}
+library(ggplot2)
+library(mice)
+library(plyr) # for re-formatting data
+library(GGally) # for plot matrices
+set.seed(12345) # makes imputation reproducible
+
+gtm <- lapop.2014.GTM[,c('b1', 'b2', 'b3', 'b4','b6','b10a','b12','b13', 'b18','b21','b21a','b32','b47a','n9','n11','n15','b3milx')]
+
+hnd <- lapop.2014.HND [,c('b1', 'b2', 'b3', 'b4','b6','b10a','b12','b13', 'b18','b21','b21a','b32','b47a','n9','n11','n15','b3milx')]
+
+slv <- lapop.2014.SLV [,c('b1', 'b2', 'b3', 'b4','b6','b10a','b12','b13', 'b18','b21','b21a','b32','b47a','n9','n11','n15','b3milx')]
+
+is.na(hnd[hnd>30]) = TRUE
+is.na(gtm[gtm>30]) = TRUE
+is.na(slv[slv>30]) = TRUE
+
+complete.hnd = na.omit(hnd)
+complete.gtm = na.omit(gtm)
+complete.slv = na.omit(slv)
+
+pr_hnd = prcomp(complete.hnd, center = TRUE, scale = FALSE)
+pr_gtm = prcomp(complete.gtm, center = TRUE, scale = FALSE)
+pr_slv = prcomp(complete.slv, center = TRUE, scale = FALSE)
+
+my_imp_hnd <- mice(hnd, printFlag = F)
+my_imp_gtm <- mice(gtm, printFlag = F)
+my_imp_slv <- mice(slv, printFlag = F)
+
+pr.hnd <- lapply(1:5,function(x) prcomp(complete(my_imp_hnd,x),scale=FALSE,center=TRUE))
+pr.gtm <- lapply(1:5,function(x) prcomp(complete(my_imp_gtm,x),scale=FALSE,center=TRUE))
+pr.slv <- lapply(1:5,function(x) prcomp(complete(my_imp_slv,x),scale=FALSE,center=TRUE))
+
+all_pc1_hnd <- data.frame(llply(1:5, function(i) pr.hnd[[i]]$x[,1]))
+all_pc1_gtm <- data.frame(llply(1:5, function(i) pr.gtm[[i]]$x[,1]))
+all_pc1_slv <- data.frame(llply(1:5, function(i) pr.slv[[i]]$x[,1]))
+
+all_pc1_hnd$avg <- rowMeans(all_pc1_hnd)
+all_pc1_gtm$avg <- rowMeans(all_pc1_gtm)
+all_pc1_slv$avg <- rowMeans(all_pc1_slv)
+
+all_pc1_hnd$norm <- scale(all_pc1_hnd$avg)
+all_pc1_gtm$norm <- scale(all_pc1_gtm$avg) 
+all_pc1_slv$norm <- scale(all_pc1_slv$avg) 
+
+trust_hnd <- data.frame(w=all_pc1_hnd$norm)
+trust_gtm <- data.frame(w=all_pc1_gtm$norm)
+trust_slv <- data.frame(w=all_pc1_slv$norm)
+
+trust_hnd = as.numeric(unlist(trust_hnd))
+trust_gtm = as.numeric(unlist(trust_gtm))
+trust_slv = as.numeric(unlist(trust_slv))
+```
+
+###Guatemala###
+##Binary##
+```{r}
+pvalue = function(index, data, variable) {
+  mydata = cbind(data[,variable], index)
+  mydata = mydata[mydata[,1] <3000,]
+  regression = lm(mydata[,2]~mydata[,1])
+  summary(regression)$coefficients[,c(1,4)]
+}
+
+pvalue(trust_gtm, lapop.2014.GTM, 'ur') #People living in rural areas are more trustful
+pvalue(trust_gtm, lapop.2014.GTM, 'q1')
+pvalue(trust_gtm, lapop.2014.GTM, 'np1')
+pvalue(trust_gtm, lapop.2014.GTM, 'np2')
+pvalue(trust_gtm, lapop.2014.GTM, 'prot3') 
+pvalue(trust_gtm, lapop.2014.GTM, 'vb2') 
+pvalue(trust_gtm, lapop.2014.GTM, 'vb10')
+pvalue(trust_gtm, lapop.2014.GTM, 'wf1') #People who don't receive government assistance are less trustful of government
+pvalue(trust_gtm, lapop.2014.GTM, 'cct1b') #People who are not household beneficiaries of conditional cash transfers are less trustful of government
+pvalue(trust_gtm, lapop.2014.GTM, 'q10a') 
+pvalue(trust_gtm, lapop.2014.GTM, 'q14') 
+pvalue(trust_gtm, lapop.2014.GTM, 'sexi') #People interviewed by a woman are more trustful (?)
+```
+
+##Continuous Variables##
+```{r}
+pvalue(trust_gtm, lapop.2014.GTM, 'pole2n') #People dissatisfied with police trust governement less
+pvalue(trust_gtm, lapop.2014.GTM, 'aoj12') #People with less confidence in judiciary punishing the guilty trust governemnt less
+pvalue(trust_gtm, lapop.2014.GTM, 'mil3')#People who trust the US military more, trust government more
+pvalue(trust_gtm, lapop.2014.GTM, 'sd3new2')#People that are dissatisfied with schools trust government less
+pvalue(trust_gtm, lapop.2014.GTM, 'infrax')#The less there is police response, the less people trust government
+pvalue(trust_gtm, lapop.2014.GTM, 'ing4') 
+pvalue(trust_gtm, lapop.2014.GTM, 'eff1') #People who agree more that leaders are interested in what people think, trust government more
+pvalue(trust_gtm, lapop.2014.GTM, 'eff2') #The more people feel they understand important political issues, the more they trust government
+pvalue(trust_gtm, lapop.2014.GTM, 'mil7')#The more people feel that Armed Forces should combat crime, the more they trust government
+pvalue(trust_gtm, lapop.2014.GTM, 'per4') 
+pvalue(trust_gtm, lapop.2014.GTM, 'per9')# More emotionally stable people trust government most
+pvalue(trust_gtm, lapop.2014.GTM, 'dem2')#People who prefer democracy and people who prefer authoritarianism tend to trust government more
+pvalue(trust_gtm, lapop.2014.GTM, 'vb1')
+pvalue(trust_gtm, lapop.2014.GTM, 'pol1') #The less people are interested in policts, the less they trust government
+pvalue(trust_gtm, lapop.2014.GTM, 'vb20') #Higher voter participation may lead to higher trust in government
+pvalue(trust_gtm, lapop.2014.GTM, 'for6') 
+pvalue(trust_gtm, lapop.2014.GTM, 'for6b') #Less US influence in country leads to higher trust in government
+pvalue(trust_gtm, lapop.2014.GTM, 'mil10a')
+pvalue(trust_gtm, lapop.2014.GTM, 'mil10e') #Less trust in the US government also results in less trust in national government
+pvalue(trust_gtm, lapop.2014.GTM, 'q5b') #The less religion is important, the less people trust government
+pvalue(trust_gtm, lapop.2014.GTM, 'q2y')#Younger people trust government less
+pvalue(trust_gtm, lapop.2014.GTM, 'q2')#Older people trust government more
+pvalue(trust_gtm, lapop.2014.GTM, 'idio2')
+pvalue(trust_gtm, lapop.2014.GTM, 'soct2')#People perceiving national economy getting worse trust government less
+pvalue(trust_gtm, lapop.2014.GTM, 'ed') #More years of education lead to less trust in government
+pvalue(trust_gtm, lapop.2014.GTM, 'q12c')
+pvalue(trust_gtm, lapop.2014.GTM, 'q12bn')
+pvalue(trust_gtm, lapop.2014.GTM, 'q12') 
+```
+###El Salvador###
+##Binary##
+```{r}
+pvalue(trust_slv, lapop.2014.SLV, 'ur')#People in rural areas are more trustful 
+pvalue(trust_slv, lapop.2014.SLV, 'q1')
+pvalue(trust_slv, lapop.2014.SLV, 'np1')
+pvalue(trust_slv, lapop.2014.SLV, 'np2')
+pvalue(trust_slv, lapop.2014.SLV, 'prot3')
+pvalue(trust_slv, lapop.2014.SLV, 'vb2') #Non-voters are more trustful
+pvalue(trust_slv, lapop.2014.SLV, 'vb10')#People that don't identify with parties are less trustful
+pvalue(trust_slv, lapop.2014.SLV, 'wf1') #People not receiving government assistance are less trustful
+pvalue(trust_slv, lapop.2014.SLV, 'cct1b')#Non-household beneficiaries of conditional cash transfers are less trustful
+pvalue(trust_slv, lapop.2014.SLV, 'q10a')
+pvalue(trust_slv, lapop.2014.SLV, 'q14') #People not intending to live abroad are less trustful
+pvalue(trust_slv, lapop.2014.SLV, 'sexi') 
+```
+
+##Continuous Variables##
+```{r}
+pvalue(trust_slv, lapop.2014.SLV, 'ico2') #The less police patrols, the less trustful in government
+pvalue(trust_slv, lapop.2014.SLV, 'pole2n')#Lower satisfaction with police may lead to lower trust in government 
+pvalue(trust_slv, lapop.2014.SLV, 'aoj12') #The less confident in judiciary punishing the guilty, the less trustful
+pvalue(trust_slv, lapop.2014.SLV, 'mil3')#Those most trustful of US Military are more trustful in government
+pvalue(trust_slv, lapop.2014.SLV, 'sd3new2') #Those less satisfied with schools are less trustful in government
+pvalue(trust_slv, lapop.2014.SLV, 'infrax')#Longer police response time may lead to lower trust in government
+pvalue(trust_slv, lapop.2014.SLV, 'ing4')#Those believing that democracy is best are more trustful of government
+pvalue(trust_slv, lapop.2014.SLV, 'eff1')#Those who believe that leaders are interested in what people think are more trustful of government 
+pvalue(trust_slv, lapop.2014.SLV, 'eff2')#Those who believe to understand important political issues are more trustful
+pvalue(trust_slv, lapop.2014.SLV, 'mil7')#Those who believe that armed forces should combat crime and violence are more trustful
+pvalue(trust_slv, lapop.2014.SLV, 'dem2')
+pvalue(trust_slv, lapop.2014.SLV, 'vb1')
+pvalue(trust_slv, lapop.2014.SLV, 'pol1') #Those least interested in politics are less trustful
+pvalue(trust_slv, lapop.2014.SLV, 'vb20')#Those engaged in voting for future president are less trustful
+pvalue(trust_slv, lapop.2014.SLV, 'for6') 
+pvalue(trust_slv, lapop.2014.SLV, 'for6b')
+pvalue(trust_slv, lapop.2014.SLV, 'mil10a')#Those least trustful of China are less trustful of government
+pvalue(trust_slv, lapop.2014.SLV,'mil10e')#Those least trustful of the US are less trustful of government
+pvalue(trust_slv, lapop.2014.SLV, 'q5b')#Least religious people are less trustful of government
+pvalue(trust_slv, lapop.2014.SLV, 'q2y')
+pvalue(trust_slv, lapop.2014.SLV, 'q2')
+pvalue(trust_slv, lapop.2014.SLV, 'idio2')#Worse perception of personal economic situation, less trustful of government
+pvalue(trust_slv, lapop.2014.SLV, 'soct2')#Worse perception of national economic situation, less trustful of government
+pvalue(trust_slv, lapop.2014.SLV, 'ed') #Those with more years of education are less trustful in government 
+pvalue(trust_slv, lapop.2014.SLV, 'q12c')
+pvalue(trust_slv, lapop.2014.SLV, 'q12bn')
+pvalue(trust_slv, lapop.2014.SLV, 'q12')
+```
+
+
