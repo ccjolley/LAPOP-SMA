@@ -6,6 +6,8 @@ output: html_document
 
 The following is a proposed index, measuring the level of civic and political participation, and civil socity involvement of the individuals interrogated. Variables such as 'Attendance to religious meetings' and 'Sports Activities' were excluded, due to them not directly falling into the categories previously listed. In all, do individuals participate in making their community's social and political environment better? If so, how often?
 
+##HONDURAS##
+
 * `cp5`: Tried to solve a community problem (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
 * `cp7`: Attended meetings of Parent Association (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
 * `cp8`: Attended meetings of Community Improvement Association (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
@@ -192,6 +194,8 @@ ggplot(cp20,aes(x=w,y=q)) +
   theme(text=element_text(size=20)) 
 ```
 
+Before, moving with the other two countries, let us drop `honcp22`and `honcp21a`from the index, since they are exclusive to the studies done in Honduras. Without them, we still have an index for all three countries in the Northern Triangle.
+
 ##Guatemala##
 
 * `cp5`: Tried to solve a community problem (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
@@ -217,10 +221,12 @@ my_data <- lapop.2014.GTM[,c('cp5','cp7','cp8','cp13','cp20')]
 is.na(my_data[my_data>16]) <- TRUE
 nrow(na.omit(my_data))
 ```
+Ignoring missing data, we are left with 748 rows.
 
 ```{r}
 sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
 ```
+About 10.1% of data missing!
 
 ```{r}
 my_complete <- na.omit(my_data)
@@ -228,29 +234,34 @@ pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
 plot(pr_complete)
 summary(pr_complete)
 ```
+Without any imputation, 43.75% of variance is concentrated on the first principal component.
 
 ```{r}
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
+Running the imputations, `cp20`is the column with the LARGEST amount of missing cells. Again, our comments made for this variable, on the Honduras index, are applicable here. Furthermore, it seems to be drawing up a pattern for the region.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
 plot(pr[[1]])
 summary(pr[[1]])
 ```
+With imputations, we have quite a decrease: 41% of variance is concentrated on the first principal component.
 
 ```{r}
 pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
 qplot(pc1,pc2)
 ```
+For my untrained eyes, I am seeing four separate clusters here, but unlike all the other ones that I have seen, this one seems to be a bit more "cohesive".
 
 ```{r}
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
+Although not perfect, the correlations seem quite strong.
 
 ```{r}
 all_pc1$avg <- rowMeans(all_pc1)
@@ -258,6 +269,12 @@ quantile(all_pc1$avg)
 colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
 colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
 ```
+OK! 
+A few things I am going to highlight:
+* Where Guatemala is concerned, our subjects for the most part attend political party meetings (`cp13`) on a VERY RARE to non-existant basis.
+* The male subjects rarely attend or are not at all present in Women's Groups meetings, though again, it would be interesting to look into the kind of guy that does go to these meetings.
+* Ditto for trying to solve community problems (`cp5`)
+* Finally, attendance seems to be more regular to Parents' Associations (`cp7`)and Community Improvement Meetings (`cp8`). I am personally not aware of what these meetings comprise or of the profile of the people that do go to them, though.
 
 ```{r}
 all_pc1$norm <- -scale(all_pc1$avg) 
@@ -284,6 +301,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
+Strong influence on score from all variables, but the index is largely dominated by `cp7`and `cp8`.
 
 ```{r}
 lmp <- function (modelobject) {
@@ -296,6 +314,7 @@ lmp <- function (modelobject) {
 sapply(c('cp5','cp7','cp8','cp13','cp20'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
+All of the p-values are small and deserve to be considered, but there's something new here: `cp8`shows a value of 0. Not close to 0, but literally the number zero!
 
 ```{r}
 cp13 <- data.frame(q=my_data$cp13,w=all_pc1$norm)
@@ -338,10 +357,12 @@ my_data <- lapop.2014.SLV[,c('cp5','cp7','cp8','cp13','cp20')]
 is.na(my_data[my_data>16]) <- TRUE
 nrow(na.omit(my_data))
 ```
+With missing values, we are left with 835 rows.
 
 ```{r}
 sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
 ```
+Approximately 9% of data missing.
 
 ```{r}
 my_complete <- na.omit(my_data)
@@ -349,29 +370,33 @@ pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
 plot(pr_complete)
 summary(pr_complete)
 ```
+Without any imputation, 35.5% of variance concentrated on first principal component.
 
 ```{r}
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
+After running the imputations, we clearly see that much like Guatemala and El Salvador, column `cp20`is largely missing data. However, if the responses to this question are like all the other indeces, then the imputation should be done with high confidence.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
 plot(pr[[1]])
 summary(pr[[1]])
 ```
+With imputation, there is a slight change, with 34.2% of variance concentrated on the first principal component.
 
 ```{r}
 pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
 qplot(pc1,pc2)
 ```
-
+What I'm seeing here is 4 separate clusters forming, with a much more solid "foundation" on the higher values.
 ```{r}
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
+And despite the large amount of missing cells in column `cp20`, the correlations are still pretty strong.
 
 ```{r}
 all_pc1$avg <- rowMeans(all_pc1)
@@ -379,6 +404,7 @@ quantile(all_pc1$avg)
 colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
 colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
 ```
+So, the NaN's that we got to see in the "Extorsion Index" are popping up here again, which makes me uncomfortable to continue with this index. Judging from the values that I have gotten on the lower 25% quartile, then much like Honduras and Guatemala, the participation of individuals in these kinds of activities, committees or gatherings goes from rarely to not at all. Interesting to see that `cp5`(Tried to solve a community problem) has a lower value (~2.47) relative to all the other variables, which would allow me to say that there is more participation in this area. Then again, with the "NaN"s, I do not feel confident enough to assert thiswith authority.
 
 ```{r}
 all_pc1$norm <- -scale(all_pc1$avg) 
@@ -405,7 +431,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
-
+All variables seem to have a strong influence on the index score, but `cp5`seems to be on the lead here, followed by `cp8`and `cp7`, in that order.
 ```{r}
 lmp <- function (modelobject) {
     if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
@@ -417,4 +443,4 @@ lmp <- function (modelobject) {
 sapply(c('cp5','cp7','cp8','cp13','cp20'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
-
+Yes! The values here are very small, but notice how EPICALLY tiny the p-value for `cp5`is!
