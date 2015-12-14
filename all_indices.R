@@ -43,7 +43,7 @@ sanity_check <- function(data,idx,var) {
   v <- data[,var]
   is.na(v[v>800000]) <- TRUE
   lo <- mean(v[idx <= quantile(idx)[2]],na.rm=TRUE)
-  hi <- mean(v[idx > quantile(idx)[4]],na.rm=TRUE)
+  hi <- mean(v[idx >= quantile(idx)[4]],na.rm=TRUE)
   c(lo,hi)
 }
   
@@ -89,6 +89,16 @@ sanity_check(lapop.2014.HND,ca_hnd,'cp7') # Agrees with Jorge's results
 summary(lm(fear_hnd ~ ca_hnd))
 # Borderline signficance (p = 0.0367), with a very small positive coefficient.
 # Looks like very-engaged people are slightly more fearful?
+
+ca_all <- make_idx(lapop.2014.all,
+                   c('cp5','cp7','cp8','cp13','cp20'),sgn=-1)
+sanity_check(lapop.2014.all,ca_all,'cp7')
+
+summary(lm(fear_all ~ ca_all))
+# Significance actually gets much higher when we look at the entire region
+# and not just HND. The effect is small, but highly-engaged people are 
+# somewhat more fearful. Given that engagement is relatively rare, it's worth
+# asking what else makes them unusual.
 
 ###############################################################################
 ## Political violence Index (Guatemala only)
@@ -186,7 +196,6 @@ summary(lm(fear_all ~ crit_all)) # significant; fearful people more sympathetic
 # dem2 has a strange scale; switch 1 and 2
 aut_hnd_data <- lapop.2014.HND[c('dem2','dem11','aut1','jc13','jc10','jc15a',
                                  'jc16a','honjc17')]
-
 aut_hnd_data$dem2[aut_hnd_data$dem2==1] <- 100
 aut_hnd_data$dem2[aut_hnd_data$dem2==2] <- 1
 aut_hnd_data$dem2[aut_hnd_data$dem2==100] <- 2
@@ -194,6 +203,15 @@ aut_hnd <- make_idx(aut_hnd_data,names(aut_hnd_data),sgn=-1)
 # Sanity check: Now, dem2==1 means democracy is preferable to all others
 sanity_check(aut_hnd_data,aut_hnd,'dem2')
 summary(lm(fear_hnd ~ aut_hnd)) # very significant and positive
+
+aut_all_data <- lapop.2014.all[c('dem2','dem11','jc13','jc10','jc15a')]
+#TODO: Haven't really checked into this index much
+aut_all_data$dem2[aut_all_data$dem2==1] <- 100
+aut_all_data$dem2[aut_all_data$dem2==2] <- 1
+aut_all_data$dem2[aut_all_data$dem2==100] <- 2
+aut_all <- make_idx(aut_all_data,names(aut_all_data))
+sanity_check(aut_all_data,aut_all,'dem2')
+summary(lm(fear_all ~ aut_all)) # very significant and positive
 
 ###############################################################################
 ## Multiple regression
@@ -241,11 +259,25 @@ summary(lm(fear_hnd ~ tr_hnd + w_hnd + crit_hnd + aut_hnd + sig_hnd$ur +
 summary(lm(crit_hnd ~ sig_hnd$ur)) # urban people less sympathetic
 summary(lm(fear_hnd ~ crit_hnd + sig_hnd$ur)) # no more correlation
 
+###############################################################################
+# Diving deeper: Community activity index
+###############################################################################
+ 
+summary(lm(ca_all ~ ex_all))
+# Significant and positive; highly-engaged people paid more bribes
+summary(lm(ca_all ~ tr_all)) # not significant
+summary(lm(ca_all ~ w_all)) # wealthy people are less engaged
+summary(lm(ca_all ~ crit_all)) # not really significant
+summary(lm(ca_all ~ aut_all)) # not significant
 
+summary(lm(ca_all ~ ex_all + w_all)) # nothing changes much
+summary(lm(fear_all ~ ca_all + w_all))
 
+summary(lm(fear_hnd ~ tr_hnd + aut_hnd + sig_hnd$ur + 
+             sig_hnd$sexi + sig_hnd$sd3new2 + sig_hnd$ico2 + sig_hnd$pole2n))
 
-
-
-
-
+# Honduras-specific
+summary(lm(fear_hnd ~ tr_hnd + aut_hnd + ca_hnd + sig_hnd$ur + 
+             sig_hnd$sexi + sig_hnd$sd3new2 + sig_hnd$ico2 + sig_hnd$pole2n))
+# Community activity retains its small but significant effect
 
