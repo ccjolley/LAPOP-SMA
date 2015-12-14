@@ -608,3 +608,35 @@ t.test(ex_sum[my_data$exc16==1],ex_sum[my_data$exc16==0])$p.value
 t.test(ex_sum[my_data$exc20==1],ex_sum[my_data$exc20==0])$p.value
 ```
 This time, they are all largely significant!
+
+```{r}
+exc2 <- data.frame(q=my_data$exc2,w=ex_sum)
+exc2 <- na.omit(exc2)
+my_lm <- lm(data=exc2, q ~ w)
+summary(my_lm)
+ggplot(exc2,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=1,hjust=0,vjust=0,color='royalblue') +
+  ylab('exc2') +
+  xlab('Simple sum') +
+  theme(text=element_text(size=20)) 
+```
+
+```{r}
+exc16 <- data.frame(q=my_data$exc16,w=ex_sum)
+exc16 <- na.omit(exc16)
+my_lm <- lm(data=exc16, q ~ w)
+summary(my_lm)
+ggplot(exc16,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=1,hjust=0,vjust=0,color='royalblue') +
+  ylab('exc16') +
+  xlab('Simple sum') +
+  theme(text=element_text(size=20)) 
+```
