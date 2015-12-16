@@ -61,9 +61,9 @@ fear_common <- c('vic44','fear10','vic1ext','vic1exta','vic1hogar','aoj11',
 fear_hnd <- make_idx(lapop.2014.HND,
                      c(fear_common,'vic40','vic41','vic43','vic45','fear6f'))
 fear_gtm <- make_idx(lapop.2014.GTM,
-                     c(fear_common,'vic40','vic41','vic43','fear6f'),
+                     c(fear_common,'vic40','vic41','vic43','fear6e','fear6f'),
                      sgn=-1)
-fear_slv <- make_idx(lapop.2014.SLV,fear_common)
+fear_slv <- make_idx(lapop.2014.SLV,c(fear_common,'elsdiso18','elsdiso19'))
 fear_all <- make_idx(lapop.2014.all,fear_common)
 
 # Sanity check: diso8==1 means gangs are a serious problem
@@ -99,6 +99,8 @@ summary(lm(fear_all ~ ca_all))
 # and not just HND. The effect is small, but highly-engaged people are 
 # somewhat more fearful. Given that engagement is relatively rare, it's worth
 # asking what else makes them unusual.
+
+# cp21 in SLV should be added to community activity index
 
 ###############################################################################
 ## Political violence Index (Guatemala only)
@@ -137,7 +139,7 @@ tr_common <- c('b1','b2','b3','b4','b6','b10a','b12','b13','b18','b21','b21a',
 
 tr_gtm <- make_idx(lapop.2014.GTM,c(tr_common,'pr4','m1'))
 tr_slv <- make_idx(lapop.2014.SLV,c(tr_common,'b11','esb48','epp1','epp3','pr4',
-                                    'epn3a','epn3b','epn3c'))
+                                    'epn3a','epn3b','epn3c','aoj18'))
 tr_hnd <- make_idx(lapop.2014.HND,c(tr_common,'b11','b37','b14','b15','b19',
                                     'b46','honb51','venb11','venhonb51',
                                     'venhonvb10','epp1','epp3'),
