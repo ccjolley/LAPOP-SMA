@@ -27,19 +27,19 @@ my_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14',
 Since many of these questions are asking people to report on rare events, we should start by looking to see whether there are any that co-occur.
 
 ```{r}
-test_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14',
-                               'exc15','exc16')]
-test_data[test_data>16] <- 0 # assume that non-responses mean no bribe paid
-colMeans(test_data)
-jitter_data <- data.frame(police=jitter(test_data$police,factor=2),
-                          gov=jitter(test_data$gov,factor=2),
-                          soldier=jitter(test_data$soldier,factor=2),
-                          muni=jitter(test_data$muni,factor=2),
-                          work=jitter(test_data$work,factor=2),
-                          courts=jitter(test_data$courts,factor=2),
-                          health=jitter(test_data$health,factor=2),
-                          school=jitter(test_data$school,factor=2))
-ggpairs(jitter_data) + theme_classic()
+#test_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14',
+#                               'exc15','exc16')]
+#test_data[test_data>16] <- 0 # assume that non-responses mean no bribe paid
+#colMeans(test_data)
+#jitter_data <- data.frame(police=jitter(test_data$police,factor=2),
+##                          gov=jitter(test_data$gov,factor=2),
+#                          soldier=jitter(test_data$soldier,factor=2),
+#                          muni=jitter(test_data$muni,factor=2),
+#                          work=jitter(test_data$work,factor=2),
+#                          courts=jitter(test_data$courts,factor=2),
+#                          health=jitter(test_data$health,factor=2),
+#                          school=jitter(test_data$school,factor=2))
+#ggpairs(jitter_data) + theme_classic()
 ```
 
 It's really disturbing that 14% of people report having paid bribes to the police. The plot is a little confusing, but the main thing to take away from it is that, for each possible pair of bribes, there are at least a few people who paid both. This gives me some hope that this could be the basis for a composite index. 
@@ -88,10 +88,10 @@ qplot(pc1,pc2)
 This isn't cool. Our PC1 is pretty much completely determined by a single variable with four levels -- based on the last iteration we can be pretty sure that it's `exc7`. What happens if we just take it out, so that we're looking at people's actual experiences with corruption rather than their perception of it?
 
 ```{r}
-pr_noexc7 <- prcomp(test_data,scale=FALSE,center=TRUE)
-plot(pr_noexc7)
-summary(pr_noexc7) # 48% of variance in the first component -- not bad, considering
-qplot(pr_noexc7$x[,1],pr_noexc7$x[,2])
+#pr_noexc7 <- prcomp(test_data,scale=FALSE,center=TRUE)
+#plot(pr_noexc7)
+#summary(pr_noexc7) # 48% of variance in the first component -- not bad, considering
+#qplot(pr_noexc7$x[,1],pr_noexc7$x[,2])
 ```
 
 Now we're seeing one binary variable that really dominates. If you look up at the previous PC1/PC2 plot, this was probably the one that dominated PC2.
