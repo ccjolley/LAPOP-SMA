@@ -476,7 +476,6 @@ pvalue(fear_slv, lapop.2014.SLV, 'mil10a')#
 pvalue(fear_slv, lapop.2014.SLV, 'mil10e')
 pvalue(fear_slv, lapop.2014.SLV, 'q5b')
 pvalue(fear_slv, lapop.2014.SLV, 'q10d')
-
 ```
 
 

@@ -58,18 +58,24 @@ fear_common <- c('vic44','fear10','vic1ext','vic1exta','vic1hogar','aoj11',
                  'diso14','diso16','diso17','vicbar1','vicbar1f','vicbar3',
                  'vicbar4','vicbar7')
 
+# New versions
+#fear_gtm <- make_idx(lapop.2014.GTM,
+#                     c(fear_common,'vic40','vic41','vic43','fear6e','fear6f'),
+#                     sgn=-1)
+#fear_slv <- make_idx(lapop.2014.SLV,c(fear_common,'elsdiso18','elsdiso19'))
+
 fear_hnd <- make_idx(lapop.2014.HND,
                      c(fear_common,'vic40','vic41','vic43','vic45','fear6f'))
 fear_gtm <- make_idx(lapop.2014.GTM,
-                     c(fear_common,'vic40','vic41','vic43','fear6e','fear6f'),
+                     c(fear_common,'vic40','vic41','vic43','fear6f'),
                      sgn=-1)
-fear_slv <- make_idx(lapop.2014.SLV,c(fear_common,'elsdiso18','elsdiso19'))
+fear_slv <- make_idx(lapop.2014.SLV,fear_common)
 fear_all <- make_idx(lapop.2014.all,fear_common)
 
 # Sanity check: diso8==1 means gangs are a serious problem
 sanity_check(lapop.2014.GTM,fear_gtm,'diso8') # 4.242424, 1.468085
 sanity_check(lapop.2014.SLV,fear_slv,'diso8') # 4.703209, 1.190476
-sanity_check(lapop.2014.HND,fear_hnd,'diso8') # 4.830334, 1.515385
+sanity_check(lapop.2014.HND,fear_hnd,'diso8') # 4.830769, 1.519182
 sanity_check(lapop.2014.all,fear_all,'diso8') # 4.593805, 1.383741
 # Make sure national indices agree with the regional one
 qplot(fear_gtm,fear_all[lapop.2014.all$pais==2]) + theme_classic()
@@ -239,7 +245,6 @@ summary(lm(fear_hnd ~ tr_hnd + w_hnd + crit_hnd + aut_hnd + sig_hnd$ur +
 # with critics is gone completely.
 summary(lm(fear_hnd ~ tr_hnd + aut_hnd + sig_hnd$ur + 
              sig_hnd$sexi + sig_hnd$sd3new2 + sig_hnd$ico2 + sig_hnd$pole2n))
-
 
 # What happened to wealth?
 
