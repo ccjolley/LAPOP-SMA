@@ -213,7 +213,7 @@ nrow(na.omit(gtm[,c(gtm_bin,gtm_cont)])) / nrow(gtm)
 ```
 We've got 59.5% of our data included in this multiple regression. 
 
-What are the correlations with all the unordered continuous variables?
+What are the correlations with all the unordered continuous variables? I'll be adding `dvw1`and `dvw2`to the list, since domestic violence is a topic that often comes up in the tweets from Central America. 
 ```{r}
 categ <- function(f,x,categ) {
   # For a data from f with a continuous variable 'x' and an unordered 
