@@ -361,5 +361,90 @@ pvalue(trust_slv, lapop.2014.SLV, 'q12c')
 pvalue(trust_slv, lapop.2014.SLV, 'q12bn')
 pvalue(trust_slv, lapop.2014.SLV, 'q12')
 ```
+Same procedure: how do our significant variables correlate with one another? First, the binaries:
+```{r}
+bin_bin <- function(data,var1,var2) {
+  v1 <- data[data[,var1] < 1000 & data[,var2] < 1000,var1]
+  v2 <- data[data[,var1] < 1000 & data[,var2] < 1000,var2]
+  ct <- table(v1,v2)
+  ft <- fisher.test(ct)
+  c(ft$p.value,ft$estimate)
+}
+slv_bin <- c('ur','vb2','vb10','wf1','cct1b','q14')
+for (x in gtm_bin) {
+  for (y in gtm_bin[-1:-which(gtm_bin==x)]) {
+    res <- bin_bin(lapop.2014.GTM,x,y)
+    if (res[1] < 0.01) {
+      print(paste(x,y,res[1],res[2]))
+    }
+  }
+}
+```
+Positive Correlations:
+* `ur`and `sexi`: Most women interviewers were in rural areas.
+* `cct1b`and `wf1`: Those not benefiting from government assistance also did not receive conditional transfers. (No brainer)
 
+Negative Correlations:
+* `ur`and `cct1b`: Most household beneficiaries of conditional cash transfers are urban.
 
+Correlations between Binaries and Continuous:
+```{r}
+bin_cont <- function(data,bvar,cvar) {
+  b <- data[data[,bvar] < 1000 & data[,cvar] < 1000,bvar]
+  b <- b - min(b) 
+  c <- data[data[,bvar] < 1000 & data[,cvar] < 1000,cvar]  
+  tt <- t.test(c[b==0],c[b==1])
+  c(tt$p.value,tt$estimate[2]-tt$estimate[1])
+}
+slv_cont <- c('ico2','pole2n','aoj12','mil3','sd3new2','infrax','ing4','eff1',
+              'eff2','mil7','pol1','vb20','mil10a','mil10e','q5b','idio2','soct2','ed')
+for (x in slv_bin) {
+  for (y in slv_cont) {
+    res <- bin_cont(lapop.2014.SLV,x,y)
+    if (res[1] < 0.01) {
+      print(paste(x,y,res[1],res[2]))
+    }
+  }
+}
+```
+Woah! It seems like we've got a wealth of correlations here!
+
+Positive Correlations:
+* `ur`and `infrax`: Faster police response time in urban areas.
+* `ur`and `eff2`: Urban people are more likely to understand important political issues.
+* `ur`and `pol1`: Urban people more interested in politics.
+* `ur`and `mil10a`: Urban people more likely to trust China.
+* `ur`and `ed`: Urban people more likely to be more educated.
+* `vb2`and `ing4`: Voters more likely to prefer democracy over any other system.
+* `vb2`and `eff2`: Voters more likely to feel that they understand the most important issues.
+* `vb10`and `pol1`: Those not identified with a political party are less likely to be interested in politics.
+* `vb10`and `idio2`: Those not identified with a political party are more likely to perceive their personal economic situation to worsen.
+* `vb10`and `soct2`: Those not identified with a political party are more likely to perceive their country's economic situation to worsen.
+* `vb10`and `ed`: People identified with a political party are more likely to be more educated.
+* `q14`and `mil3`: Those with the intention of moving to another country are more trusting of the US Military (interesting! Could this be from the overall perception of the US or from the intention of serving in the US Military?)
+* `q14`and `pol1`: Those with the intention of moving to another country are least interested in politics.
+* `q14`and `mil10e`: Those with the intention of moving to another country are more trusting of the US (here is one answer!)
+
+Negative Correlations:
+* `ur`and `ico2`: Less frequency of police patrols in rural areas.
+* `ur`and `pole2n`: More satisfaction with police performance in rural areas (a bit counterintuitive, unless my reading is wrong!)
+* `ur`and `aoj12`: Urban people are less confident that judiciary will punish guilty.
+* `ur`and `eff1`: Urban people are less likely to believe that leaders are interested in what people think.
+* `vb2`and `pol1`: Voters more likely to be interested in politics. 
+* `vb2`and `vb20`: Voters more likely to return to the ballot box during next presidential election (if held next week).
+* `vb10`and `mil3`: Those not identifying with a political party are less likely to trust the US Military.
+* `vb10`and `ing4`: Those not identified with a political party are less likely to prefer democracy over any other system.
+* `vb10`and `eff1`: Those not identified with a political party are less likely to believe that leaders are interested in what people think.
+* `vb10`and `eff2`: Those not identified with a political party are less likely to understand most important political issues. 
+* `vb10`and `mil7`: Those not identified with a political party disagree with Armed Forces participating in combating crime and violence.
+* `vb10`and `vb20`: Those not identified with a political party less likely to vote during next presidential elections (if held next week)
+* `vb10`and `mil10a`: Those identified with a political party are more likely to trust China.
+* `vb10`and `mil10e`: Those identified with a political party are more likely to trust the United States.
+* `wf1`and `ed`: Less educated people are more likely to receive government assistance
+* `cct1b`and `ed`: Less educated people are more likely to be household beneficiaries of conditional cash transfers
+* `q14`and `pole2n`: Those with the intention of moving to another country are more likely dissatisfied with police performance.
+* `q14`and `aoj12`: Those with the intention of moving to another country are less confident in judiciary punishing the guilty.
+* `q14`and `eff2`: Those with the intention of moving to another country are less likely to understand most important political issues
+* `q14`and `ed`: Those with the intention of moving to another country are less educated.
+
+Interesting things to take note of in regards to the profile of these individuals: education, urbanization, intention to move to another country, trust in judiciary and satisfaction with police performance (impunity markers) are relevant to how much people trust the government, and how it molds their perception of external parties, such as the US and China. There also seems to be indicators here pointing to how certain people prioritize their economic stability over all other things, including politics.
