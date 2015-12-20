@@ -448,3 +448,49 @@ Negative Correlations:
 * `q14`and `ed`: Those with the intention of moving to another country are less educated.
 
 Interesting things to take note of in regards to the profile of these individuals: education, urbanization, intention to move to another country, trust in judiciary and satisfaction with police performance (impunity markers) are relevant to how much people trust the government, and how it molds their perception of external parties, such as the US and China. There also seems to be indicators here pointing to how certain people prioritize their economic stability over all other things, including politics.
+
+What do continuous variables tell us?
+
+```{r}
+cont_cont <- function(data,var1,var2) {
+  v1 <- data[data[,var1] < 1000 & data[,var2] < 1000,var1]
+  v2 <- data[data[,var1] < 1000 & data[,var2] < 1000,var2]
+  reg <- lm(v1~v2)
+  summary(reg)$coefficients[2,c(1,4)]
+}
+for (x in slv_cont) {
+  for (y in slv_cont[-1:-which(slv_cont==x)]) {
+    res <- cont_cont(lapop.2014.SLV,x,y)
+    if (res[2] < 0.01) {
+      print(paste(x,y,res[2],res[1]))
+    }
+  }
+}
+```
+It seriously feels like I have been hitting the jackpot here! (If only that was true for my trips to Vegas...)
+
+Positive Correlations:
+* `ico2`and `pole2n`: The less frequency of police patrols, the more people are dissatisfied with police.
+* `ico2`and `aoj12`: The less frequency of police patrols, the less people are confident on judiciary punishing the guilty.
+* `ico2`and `sd3new2`: The less frequency of police patrols, the more people are dissatified with public schools.
+* `ico2`and`infrax`: Less frequency of police patrols, longer police response times.
+* `ico2`and `soct2`: The less frequency of police patrols, the more people believe country's economic situation to worsen.
+* `pole2n`and `aoj12`: More dissatisfaction with police, less confidence in judiciary punishing the guilty.
+* `pole2n`and `sd3new2`: More dissatisfaction with police, more dissatisfaction with public schools.
+* `pole2n`and `infrax`: People dissatisfied with police also complain about long police response times.
+* `pole2n`and `idio2`: People dissatisfied with police believe their personal economic situation is getting worse.
+* `pole2n`and `soct2`: People dissatisfied with police percieve their country's economic situation is getting worse.
+* `pole2n`and `ed`: People dissatisfied with police are also more likely to be more educated. (Most likely correlated to the 'urban' factor.)
+* `aoj12`and `infrax`: Those least confident in judiciary punishing the guilty also complain about long police response times.
+* `aoj12`and `q5b`: Those least confident in judiciary punishing the guilty are also the least religious.
+* `aoj12` and `soct2`: Those least confident in judiciary punishing the guilty also perceive country's economy getting worse.
+* `aoj12`and `ed`: Those least confident in judiciary punishing the guilty are also more educated.
+
+Negative Correlations:
+* `ico2`and `ing4`: Less frequency of police patrols, the less people prefer democracy over all systems (interesting for the authoritarianism index! There may be a question of security here!).
+* `ico2`and `eff1`: The less frequency of police patrols, the less people believe that leaders are interested in what people think.
+* `pole2n`and `eff1`: People dissatisfied with police are less likely to believe that leaders are interested in what people think.
+* `aoj12`and `mil3`: Those least confident in judiciary punishing the guilty are also less trusting of the US Military.
+* `aoj12`and `sd3new2`: Those least confident in judiciary punishing the guilty are also dissatisfied with public schools.
+* `aoj12`and `eff1`: Those least confident in judiciary punishing the guilty are less likely ot believe that leaders are interested in what people think.
+* 
