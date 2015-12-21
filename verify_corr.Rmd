@@ -1,10 +1,19 @@
+---
+title: "Verify correlations"
+author: "Craig"
+date: "12 December 2015"
+output: html_document
+---
+
+Rather than re-calculating all of the indices here, we've got the code to do this stashed in a separate R file.
+
+``` {r}
 source('make_indices.R')
+```
 
+To systematically explore all possible correlations with our fear index, we first need to see which haven't been accounted for in one of our other composite indices.
 
-###############################################################################
-# Which variables aren't included in one of our indices?
-###############################################################################
-
+```{r}
 n_fear_more <- c(fear_common,'vic40','vic41','vic43','vic45','fear6f')
 n_ca_common <- c('cp5','cp7','cp8','cp13','cp20')
 n_ca_more <- c(n_ca_common,'honcp22','honcp21a','cp21')
@@ -35,9 +44,12 @@ unused_slv <- names(lapop.2014.SLV)[!(names(lapop.2014.SLV) %in% used) &
                                       !(names(lapop.2014.SLV) %in% unused_common)]
 unused_hnd <- names(lapop.2014.HND)[!(names(lapop.2014.HND) %in% used) & 
                                       !(names(lapop.2014.HND) %in% unused_common)]
+```
 
-## Check whether variables are binary
+We now have a list of unused variables that are common to all three countries, as well as a list of the unique unused variables for each country. Next, we need to categorize these variables as binary, ordered, or unordered categorical.
 
+```{r}
+# Assume a function is binary if only two responses are present
 is_binary <- function(data,var) {
   u <- unique(data[,var])
   length(u[u<888888]) == 2
@@ -69,16 +81,13 @@ ord_slv <- unused_slv[!(unused_slv %in% bin_slv) &
 unord_hnd <- c('dst1','vb3n','vb11','leng1')
 ord_hnd <- unused_hnd[!(unused_hnd %in% bin_hnd) &
                               !(unused_hnd %in% unord_hnd)]
+```
 
+The appopriate method for finding correlations will be different for each of these three types of variables. I've defined three functions that take the same inputs and produce similar outputs, so that all can be combined and compared at the end.
 
-###############################################################################
-## Functions to find correlations
-###############################################################################
-# TODO: modify these so that idx is another column in the same dataframe, not
-# an independent vector.
-# TODO: put these function definitions in another file so they're not taking
-# up space here. Add some comments about exactly what they do.
+Note that all of the functions below set the p-value cutoff, by default, to `1/ncol(data)` This is appropriate in cases (like this one) where we're looking at a large number of variables -- if we have more variables then we're more likely to observe spurious correlations so we need to be stricter. 
 
+```{r}
 bin_cor <- function(data,var1,var2,cutoff=0) {
   # Determine the correlation between a variable var1 and a binary variable 
   # var2. This uses a Fisher test conditioned on the values of var2, and will
@@ -87,7 +96,7 @@ bin_cor <- function(data,var1,var2,cutoff=0) {
                    stringsAsFactors=FALSE)
   if (var1 != var2) {
     if (cutoff == 0) {
-      cutoff <- 1 / nrow(data)
+      cutoff <- 1 / ncol(data)
     }
     tmp <- data.frame(v1=data[,var1],v2=data[,var2])
     is.na(tmp[tmp>800000]) <- TRUE
@@ -113,7 +122,7 @@ ord_cor <- function(data,var1,var2,cutoff=0) {
                    stringsAsFactors=FALSE)
   if (var1 != var2) {
     if (cutoff == 0) {
-      cutoff <- 1 / nrow(data)
+      cutoff <- 1 / ncol(data)
     }
     tmp <- data.frame(v1=data[,var1],v2=data[,var2])
     is.na(tmp[tmp>800000]) <- TRUE
@@ -132,6 +141,9 @@ unord_cor <- function(data,var1,var2,cutoff=0) {
   # categorical variable var2. Do this by creating a binary variable for each
   # possible value of var2 and calling bin_cor().
   vals <- na.omit(unique(data[data[,var2] < 800000,var2]))
+  if (cutoff == 0) {
+    cutoff <- 1 / ncol(data)
+  }
   tmp <- data.frame(v1=data[,var1])
   is.na(tmp[tmp>800000]) <- TRUE
   for (x in vals) {
@@ -139,10 +151,11 @@ unord_cor <- function(data,var1,var2,cutoff=0) {
   }
   ldply(names(tmp),function(x) bin_cor(tmp,'v1',x,cutoff))
 }
+```
 
-###############################################################################
-## Now get region-wide correlations
-###############################################################################
+Now we're going to look at the region-wide correlations. First, define a data frame that will contain all of the variables that were not used to generate composite indices, along with the composite indices.
+
+```{r}
 a <- lapop.2014.all[,unused_common]
 is.na(a[a>800000]) <- TRUE
 # add in all of the composite indices
@@ -153,20 +166,23 @@ a$w_idx <- w_all
 a$crit_idx <- crit_all
 a$aut_idx <- aut_all
 idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx')
+```
 
+Next, we'll use the functions defined above to get all of our correlations. We'll keep those with p-values below the cutoff of `r 1/ncol(a)`
+
+```{r}
 cor_all_bin <- ldply(bin_common, function(x) bin_cor(a,'fear_idx',x))
 cor_all_ord <- ldply(ord_common, function(x) ord_cor(a,'fear_idx',x))
 cor_all_idx <- ldply(idxs, function(x) ord_cor(a,'fear_idx',x))
 cor_all_unord <- ldply(unord_common, function(x) unord_cor(a,'fear_idx',x))
 cor_all <- rbind(cor_all_bin,cor_all_ord,cor_all_unord,cor_all_idx)
 cor_all <- cor_all[order(cor_all$pval),]
+head(cor_all,15)
+```
 
+While we have a list of which values of unordered categorical variables are significantly correlated with the fear index, the variables aren't formatted in a way that will be useful for multiple regression. We'll do this by creating dummy variables, with the same names as the `var` column in `cor_all`. (For example, `ocup1a_4` for `ocup1a == 4`.)
 
-###############################################################################
-# Create a new data frame containing all of the variables we want to use
-# in multiple regressions.
-###############################################################################
-
+```{r}
 unord_vars <- ldply(cor_all_unord$var, function(x)
   data.frame(var=strsplit(x,'_')[[1]][1],
              val=as.numeric(strsplit(x,'_')[[1]][2]),
@@ -175,17 +191,21 @@ unord_vars <- ldply(cor_all_unord$var, function(x)
 for (i in 1:nrow(unord_vars)) {
   a[,unord_vars$str[i]] <- as.numeric(a[,unord_vars$var[i]] == unord_vars$val[i])
 }
-
-# keep only the variables that showed a strong correlation with the fear
-# index
 a2 <- a[,cor_all$var]
 a2$fear_idx <- a$fear_idx
+```
 
-# now impute on the variables that correlate with fear (but don't use fear!)
+One thing that can cause trouble in multiple regression is missing values -- we can only include rows in our dataframe that have a non-NA value for all of the variables compared. This means that as we add in more and more variables, we throw out more and more data, and our final results can be biased. We'll get around this by using multiple imputation. We'll need to create a predictor matrix (named `pm`) to account for the fact that we don't want to be using our fear index to impute values of the other variables -- this would be sort of circular logic!
+
+```{r}
 pm <- 1 - diag(ncol(a2))
 pm[,which(names(a2)=='fear_idx')] <- 0
 b <- mice(a2,printFlag=F,predictorMatrix=pm)
+```
 
+As our first test of significance, we'll throw everything into a multiple correlation, and get a list of the variables for which the p-value in the multiple correlation is less than `1/ncol(a)`.
+
+```{r}
 get_pvals <- function(i) {
   bi <- complete(b,i)
   pvals <- summary(lm(fear_idx ~ .,data=bi))$coefficients[,4]  
@@ -193,12 +213,29 @@ get_pvals <- function(i) {
 }
 
 pvals <- apply(ldply(1:5,get_pvals),2,max)
-pvals[pvals<1/nrow(a2)] # apppropriate cutoff = 1/n
+pvals[pvals<1/ncol(a)] # apppropriate cutoff = 1/n
 
-# Now we're talking: just 7 correlations that hold up in all 5 imputations
-# ur, it1, pole2n, q3c_5, community activity, trust, authoritarianism.
 
-# What if we go from the other direction, gradually removing the weakest correlations?
+```
+
+Which values are significant?
+
+- `ur`: Urbanization
+- `it1`: Interpersonal trust
+- `tr_idx`: Trust in government index
+- `pole2n`: Satisfaction with police performance
+- `aut_idx`: Authoritarianism index
+- `pol1`: Interest in politics
+- `clien1n`: Knows someone offered benefit for vote
+- `mil10c`: Trustworthiness of Iranian government
+- `ocup4a == 3`: Actively looking for a job
+- `a4 == 5`: Believes crime is the most serious problem
+- `q3c == 5`: Evangelical/Protestant
+- `ca_idx`: Community activity index
+
+Rather than throwing everything in and seeing which correlations are the strongest, we could also try going the other direction, gradually "pruning" correlations and stopping when only the strongest remain. Does this give us different results?
+
+```{r}
 prune <- function(imp,i,cutoff=0) {
   bi <- complete(b,i)
   pvals <- summary(lm(fear_idx ~ .,data=bi))$coefficients[,4]
@@ -213,28 +250,47 @@ prune <- function(imp,i,cutoff=0) {
   }
   bi
 }
+Reduce(intersect,llply(1:5,function(i) names(prune(b,i,1/ncol(a)))))
+```
 
-Reduce(intersect,llply(1:5,function(i) names(prune(b,i))))
-# The same list as before, with for6 (influence of China) and pol1 (interest in politics) added in.
+This gives us a couple of new leads to follow:
 
-# one more thing to try: which variables have the lowest p-values in pairwise
-# correlations?
+- `for6`: Influence of China in country
+- `aoj22 == 1`: Reduce crime by implementing preventive measures
+
+Finally, it's worth asking which pairwise correlations are the strongest after multiple imputation. These could also give us some useful leads to follow in the social media analysis. Rather than keeping all below a certain cutoff, we'll look at the top 15 (the same number we got in the last step).
+
+```{r}
 get_justone <- function(var) {
   pvals <- sapply(1:5,function(i) 
     summary(lm(fear_all ~ complete(b,i)[,var]))$coefficients[2,4])
   max(pvals)
 }
 pair_pvals <- sort(sapply(names(a2),get_justone))
-pair_pvals[2:11]
-# If I ignore multiple correlation effects, then I also see www1, ed2, ed, w_idx, and pn4
-# This is important for social media analyses -- while we might expect the average SM user
-# to be more educated, wealthy, and computer-literate, people with those qualities aren't,
-# on average, more fearful than people who are similar in terms of the variables that came
-# out on top in multiple regression.
+pair_pvals[2:16]
+```
 
-# Pool results to get coefficients
-b.reg <- with(data=b,exp=lm(fear_idx ~ ur + it1 + tr_idx + pole2n + aut_idx + for6 + pol1 + q3c_5 + ca_idx))
+We see the usual suspects, plus:
+
+- `www1`: Internet usage
+- `ed`: Years of schooling
+- `ed2`: Education level of mother
+- `w_idx`: Wealth index
+- `sd3new2`: Satisfaction with public schools
+- `sd6new2`: Satisfaction with public health services
+- `pn4`: Satisfaction with democracy
+- `q14`: Intends to live or work abroad
+
+To get average coefficients over the five imputed datasets, we'll need to pool results:
+
+```{r}
+b.reg <- with(data=b,exp=lm(fear_idx ~ ur + it1 + tr_idx + pole2n + aut_idx + 
+                              for6 + pol1 + clien1n + mil10c + ocup4a_3 + a4_5 + 
+                              q3c_5 + ca_idx + aoj22_1 + fear_idx))
 b.reg.pool <- pool(b.reg)
 summary(b.reg.pool)
+```
 
+`mil10c` is intriguing -- more fearful people consider the Iranian government more trustworthy. Does the idea of an authoritarian theocracy appeal to them? Also people interested in politics are less fearful, and people who see a large role for China in their country are more fearful.
 
+**NEXT:** See whether there are any interesting correlations hiding in the variables that were unique to individual countries.
