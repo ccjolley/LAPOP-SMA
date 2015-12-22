@@ -44,6 +44,11 @@ unused_slv <- names(lapop.2014.SLV)[!(names(lapop.2014.SLV) %in% used) &
                                       !(names(lapop.2014.SLV) %in% unused_common)]
 unused_hnd <- names(lapop.2014.HND)[!(names(lapop.2014.HND) %in% used) & 
                                       !(names(lapop.2014.HND) %in% unused_common)]
+# common questions with country-specific answers
+addback <- c('vb3n','vb11','leng1')
+unused_gtm <- c(unused_gtm,addback)
+unused_slv <- c(unused_slv,addback)
+unused_hnd <- c(unused_hnd,addback)
 ```
 
 We now have a list of unused variables that are common to all three countries, as well as a list of the unique unused variables for each country. Next, we need to categorize these variables as binary, ordered, or unordered categorical.
@@ -153,6 +158,8 @@ unord_cor <- function(data,var1,var2,cutoff=0) {
 }
 ```
 
+**Region-wide**
+
 Now we're going to look at the region-wide correlations. First, define a data frame that will contain all of the variables that were not used to generate composite indices, along with the composite indices.
 
 ```{r}
@@ -237,7 +244,7 @@ Rather than throwing everything in and seeing which correlations are the stronge
 
 ```{r}
 prune <- function(imp,i,cutoff=0) {
-  bi <- complete(b,i)
+  bi <- complete(imp,i)
   pvals <- summary(lm(fear_idx ~ .,data=bi))$coefficients[,4]
   pvals <- pvals[names(pvals) != '(Intercept)']
   if (cutoff == 0) {
@@ -261,12 +268,13 @@ This gives us a couple of new leads to follow:
 Finally, it's worth asking which pairwise correlations are the strongest after multiple imputation. These could also give us some useful leads to follow in the social media analysis. Rather than keeping all below a certain cutoff, we'll look at the top 15 (the same number we got in the last step).
 
 ```{r}
-get_justone <- function(var) {
+# TODO: I can do this more sophisticatedly by using with.mids() and pooling, I think...
+get_justone <- function(imp,idx,var) {
   pvals <- sapply(1:5,function(i) 
-    summary(lm(fear_all ~ complete(b,i)[,var]))$coefficients[2,4])
+    summary(lm(idx ~ complete(imp,i)[,var]),data=complete(imp,i))$coefficients[2,4])
   max(pvals)
 }
-pair_pvals <- sort(sapply(names(a2),get_justone))
+pair_pvals <- sort(sapply(names(a2),function(x) get_justone(b,fear_all,x)))
 pair_pvals[2:16]
 ```
 
@@ -293,4 +301,122 @@ summary(b.reg.pool)
 
 `mil10c` is intriguing -- more fearful people consider the Iranian government more trustworthy. Does the idea of an authoritarian theocracy appeal to them? Also people interested in politics are less fearful, and people who see a large role for China in their country are more fearful.
 
-**NEXT:** See whether there are any interesting correlations hiding in the variables that were unique to individual countries.
+**Guatemala**
+
+Next, let's see if any of the Guatemala-specific variables are interesting. The remainder will (as they say) be left as an exercise for the reader.
+
+```{r}
+g <- lapop.2014.GTM[,c(unused_common,unused_gtm)]
+is.na(g[g>800000]) <- TRUE
+g$fear_idx <- fear_gtm
+g$ca_idx <- ca_all[lapop.2014.all$pais==2] # there is no ca_gtm
+g$tr_idx <- tr_gtm
+g$w_idx <- w_gtm
+g$crit_idx <- crit_all[lapop.2014.all$pais==2]
+g$aut_idx <- aut_all[lapop.2014.all$pais==2]
+g$pv_idx <- pv_gtm
+idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx','pv_idx')
+
+cor_gtm_bin <- ldply(c(bin_common,bin_gtm), function(x) bin_cor(g,'fear_idx',x))
+cor_gtm_ord <- ldply(c(ord_common,ord_gtm), function(x) ord_cor(g,'fear_idx',x))
+cor_gtm_idx <- ldply(idxs, function(x) ord_cor(g,'fear_idx',x))
+cor_gtm_unord <- ldply(c(unord_common,unord_gtm), function(x) 
+  unord_cor(g,'fear_idx',x))
+cor_gtm <- rbind(cor_gtm_bin,cor_gtm_ord,cor_gtm_unord,cor_gtm_idx)
+cor_gtm <- cor_gtm[order(cor_gtm$pval),]
+head(cor_gtm,15)
+```
+
+We definitely see a few variables that weren't on the menu before; some of these we might want to add into the indices we have.
+
+```{r}
+unord_vars_g <- ldply(cor_gtm_unord$var, function(x)
+  data.frame(var=strsplit(x,'_')[[1]][1],
+             val=as.numeric(strsplit(x,'_')[[1]][2]),
+             str=x,
+             stringsAsFactors=FALSE))
+for (i in 1:nrow(unord_vars_g)) {
+  g[,unord_vars_g$str[i]] <- as.numeric(g[,unord_vars_g$var[i]] == unord_vars_g$val[i])
+}
+g2 <- g[,cor_gtm$var]
+g2$fear_idx <- g$fear_idx
+
+pm_g <- 1 - diag(ncol(g2))
+pm_g[,which(names(g2)=='fear_idx')] <- 0
+g_imp <- mice(g2,printFlag=F,predictorMatrix=pm_g)
+
+get_pvals_g <- function(i) {
+  bi <- complete(g_imp,i)
+  pvals <- summary(lm(fear_idx ~ .,data=bi))$coefficients[,4]  
+  pvals[names(pvals) != '(Intercept)']
+}
+pvals <- apply(ldply(1:5,get_pvals_g),2,max)
+pvals[pvals<1/ncol(g)] # apppropriate cutoff = 1/n
+```
+
+So what are the strongest correlates in Guatemala?
+
+- `fear6e`: Insecurity on public transportation (add to index?)
+- `aoj21 == 2`: Gangs are biggest threat to security
+- `aoj21 == 8`: Biggest threat = none of the above
+- `ur`: Urbanizaton
+- `it1`: Interpersonal trust
+- `aut_idx`: Authoritarianism index
+- `pv_idx`: Political violence index
+- `tr_idx`: Trust in government index
+- `a4 == 27`: Most serious problem = lack of security
+
+We see some new themes, as well as some overlap with the region-wide trends.
+
+```{r}
+Reduce(intersect,llply(1:5,function(i) names(prune(g_imp,i,1/ncol(g)))))
+```
+
+Pruning gives us a slightly longer list, including:
+
+- `leng4 == 1`: Parents' language (Spanish vs. indigenous)
+- `a4 == 5`: Crime the biggest problem
+- `vb20 == 4`: Plans to vote but leave ballot blank
+- `d6`: Approval of same-sex marriage
+
+Finally, let's see which correlations are strongest in Guatemala when we *don't* take multiple correlations into account:
+
+```{r}
+pair_pvals_g <- sort(sapply(names(g2),function(x) get_justone(g_imp,fear_gtm,x)))
+pair_pvals_g[2:16]
+```
+
+In addition to the others we've seen, there's:
+
+- `guatetid2n == 16`: Ethnic group = Q'eqchi'
+- `leng1 == 201`: Native language = Spanish
+- `leng1 == 207`: Native language = Q'eqchi'
+- `leng4 == 3`: Parents spoke only an indigenous language
+- `etid == 2`: Latino ethnicity
+- `pv3`: Believes violence was used in 2015 elections
+
+So, in addition to the region-wide themes, the Guatemala survey shows some correlations with themes that were only really investigated there -- indigenous vs. Latino ethnicity and election-related political violence. My intuition is that the ethnicity-related questions correlate strongly with an urban/rural split:
+
+```{r}
+summary(pool(with(data=g_imp,exp=lm(fear_idx ~ leng4_1 + leng1_201 + etid_2))))
+```
+
+So people are, on average, more fearful of crime if their parents only spoke Spanish, and if their native language is Spanish, and if they identify as Latino.
+
+```{r}
+summary(pool(with(data=g_imp,exp=lm(fear_idx ~ ur + leng4_1 + leng1_201 + etid_2))))
+```
+
+When we add urbanization into the mix, only the parents' native language still matters. 
+
+```{r}
+summary(pool(with(data=g_imp,exp=lm(fear_idx ~ guaetid2n_1 + guaetid2n_16 + guaetid2n_22))))
+summary(pool(with(data=g_imp,exp=lm(fear_idx ~ ur + guaetid2n_1 + guaetid2n_16 + guaetid2n_22))))
+```
+
+Whether we include urbanization or not, Achí (1) and Q'eqchi' (16) people are less fearful than their neighbors, while Garífuna (22) are more fearful. Of course, only `r sum(g$guaetid2n==1,na.rm=TRUE)` Achí  were surveyed at all.
+
+**El Salvador**
+
+**Honduras**
+
