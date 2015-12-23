@@ -301,6 +301,8 @@ summary(b.reg.pool)
 
 `mil10c` is intriguing -- more fearful people consider the Iranian government more trustworthy. Does the idea of an authoritarian theocracy appeal to them? Also people interested in politics are less fearful, and people who see a large role for China in their country are more fearful.
 
+**TODO:** These methods are OK, but there are more sophisticated approaches we could try, like ANOVA and stepwise regression. I'm not sure how well these have been implemented for multiply-imputed data; that could be more of a challenge. See: http://www.statmethods.net/stats/regression.html
+
 **Guatemala**
 
 Next, let's see if any of the Guatemala-specific variables are interesting. The remainder will (as they say) be left as an exercise for the reader.
@@ -392,16 +394,16 @@ In addition to the others we've seen, there's:
 - `leng1 == 201`: Native language = Spanish
 - `leng1 == 207`: Native language = Q'eqchi'
 - `leng4 == 3`: Parents spoke only an indigenous language
-- `etid == 2`: Latino ethnicity
+- `etid == 2`: Ladino ethnicity
 - `pv3`: Believes violence was used in 2015 elections
 
-So, in addition to the region-wide themes, the Guatemala survey shows some correlations with themes that were only really investigated there -- indigenous vs. Latino ethnicity and election-related political violence. My intuition is that the ethnicity-related questions correlate strongly with an urban/rural split:
+So, in addition to the region-wide themes, the Guatemala survey shows some correlations with themes that were only really investigated there -- indigenous vs. Ladino ethnicity and election-related political violence. My intuition is that the ethnicity-related questions correlate strongly with an urban/rural split:
 
 ```{r}
 summary(pool(with(data=g_imp,exp=lm(fear_idx ~ leng4_1 + leng1_201 + etid_2))))
 ```
 
-So people are, on average, more fearful of crime if their parents only spoke Spanish, and if their native language is Spanish, and if they identify as Latino.
+So people are, on average, more fearful of crime if their parents only spoke Spanish, and if their native language is Spanish, and if they identify as Ladino.
 
 ```{r}
 summary(pool(with(data=g_imp,exp=lm(fear_idx ~ ur + leng4_1 + leng1_201 + etid_2))))
