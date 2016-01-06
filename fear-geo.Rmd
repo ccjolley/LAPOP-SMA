@@ -5,169 +5,14 @@ date: "November 5, 2015"
 output: html_document
 ---
 
-For now, I'm basing this on a version of the fear index where I'm removing `vic45` and `a4`. In addition, the following variables were not collected in El Salvador (although they were in both Honduras and Guatemala):
-
-- `vic40`: Out of fear of crime, has limited the places to go shopping
-- `vic41`: Out of fear of crime, has limited the places to go for recreation
-- `vic43`: Out of fear of crime, has felt the need to change neighborhoods
-- `fear6f`: Insecurity at Schools
+Build all of the composite indices
 
 
 ```{r}
-library(ggplot2)
-library(mice)
+source('make_indices.R')
+library(ggmap)
 library(plyr)
-library(GGally)
-
-lapop.2014.HND <- read.csv("../2014-HND.csv",stringsAsFactors=FALSE)
-lapop.2014.SLV <- read.csv("../2014-SLV.csv",stringsAsFactors=FALSE)
-lapop.2014.GTM <- read.csv("../2014-GTM.csv",stringsAsFactors=FALSE)
-set.seed(12345) # for reproducibility
-
-incl <- c('vic44','fear10','vic1ext',
-         'vic1exta','vic1hogar','aoj11','pese1','pese2','aoj17','diso7',
-         'diso8','diso10','diso18','diso14','diso16','diso17','vicbar1', 
-         'vicbar1f','vicbar3','vicbar4','vicbar7')
-
-hnd_data <- lapop.2014.HND[,incl]
-slv_data <- lapop.2014.SLV[,incl]
-gtm_data <- lapop.2014.GTM[,incl]
-my_data <- rbind(gtm_data,hnd_data,slv_data)
-
-my_data$vic1exta[my_data$vic1exta == 999999] <- 0
-is.na(my_data[my_data>30]) <- TRUE
-
-my_imp <- mice(my_data, printFlag = F)
-pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
-
-all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
-names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
-ggpairs(all_pc1) + theme_classic()
-```
-
-This is a bit of a problem -- `imp1` and `imp4` appear to have values that are the negative of all the others. We'll have to flip their signs.
-
-```{r}
-all_pc1$imp1 <- -all_pc1$imp1
-all_pc1$imp4 <- -all_pc1$imp4
-ggpairs(all_pc1) + theme_classic()
-```
-
-That's better. Moving on...
-
-```{r}
-all_pc1$avg <- rowMeans(all_pc1)
-colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm = TRUE)
-colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],], na.rm = TRUE)
-```
-
-The values look to be reversed -- higher scores seem to correlate with less fear. Let's reverse things.
-
-```{r}
-all_pc1$norm <- scale(-all_pc1$avg) 
-predict_data <- data.frame(vic44 = c(0,1), fear10 = c(0,1), 
-                           vic1ext = c(2,1),vic1exta=c(0,20),
-                           vic1hogar=c(2,1),aoj11=c(1,4),pese1=c(3,1),
-                           pese2=c(3,1),aoj17=c(4,1),diso7=c(5,1),diso8=c(5,1),
-                           diso10=c(5,1),diso18=c(5,1),diso14=c(5,1),
-                           diso16=c(5,1),diso17=c(5,1),vicbar1=c(2,1),
-                           vicbar1f=c(3,1),vicbar3=c(2,1),vicbar4=c(2,1),
-                           vicbar7=c(2,1))
-
-tmp <- sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1])
-# we've got those nasty sign flips in imp1 and imp4 again that we have to fix
-tmp[,1] <- -tmp[,1]
-tmp[,4] <- -tmp[,4]
-minmax <- rowMeans(tmp)
-minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg)
-# you can check that the values in minmax are really close to the minimum and maximum values you 
-# get from quantile(all_pc1$norm)
-
-fear <- data.frame(w=all_pc1$norm) 
-
-predict_data2 <- data.frame(diag(21))
-names(predict_data2) <- names(predict_data)
-# right now, you have something that would feed 0's and 1's into your score
-# prediction -- this doesn't really make sense because many of your questions
-# are on a scale from 1-2 or 1-4. Here's one (slightly clunky) way to fix it:
-predict_data2$vic1ext <- 2 - predict_data2$vic1ext
-predict_data2$vic1hogar <- 2 - predict_data2$vic1hogar
-predict_data2$aoj11 <- 1 + 3*predict_data2$aoj11
-predict_data2$aoj17 <- 4 - 3*predict_data2$aoj17
-predict_data2$pese1 <- 3 - 2*predict_data2$pese1
-predict_data2$pese2 <- 3 - 2*predict_data2$pese2
-predict_data2$diso7 <- 5 - 4*predict_data2$diso7
-predict_data2$diso8 <- 5 - 4*predict_data2$diso8
-predict_data2$diso10 <- 5 - 4*predict_data2$diso10
-predict_data2$diso18 <- 5 - 4*predict_data2$diso18
-predict_data2$diso14 <- 5 - 4*predict_data2$diso14
-predict_data2$diso16 <- 5 - 4*predict_data2$diso16
-predict_data2$diso17 <- 5 - 4*predict_data2$diso17
-predict_data2$vicbar1 <- 2 - predict_data2$vicbar1
-predict_data2$vicbar1f <- 3 - 2*predict_data2$vicbar1f
-predict_data2$vicbar3 <- 2 - predict_data2$vicbar3
-predict_data2$vicbar4 <- 2 - predict_data2$vicbar4
-predict_data2$vicbar7 <- 2 - predict_data2$vicbar7
-
-
-
-# Now, in each row of predict_data2, all values are those that will give a lower score,
-# except for one.
-tmp <- sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1])
-tmp[,1] <- -tmp[,1]
-tmp[,4] <- -tmp[,4]
-scores <- rowMeans(tmp)
-scores <- -(scores - mean(all_pc1$avg))/sd(all_pc1$avg)
-# Now you can see that all of the scores are reasonably close to the minimum value
-# stored in minmax.
-
-diff <- data.frame(d=(scores-minmax[1]), n = names(predict_data))
-ggplot(diff, aes(x=n,y=d)) + 
-  geom_bar(stat = 'identity', fill = 'skyblue') + 
-  coord_flip() + 
-  theme_classic() + 
-  theme(text = element_text(size=20), 
-        axis.title.y = element_blank(),
-        axis.title.x = element_blank())
-```
-
-Let's check the p-values:
-
-```{r}
-lmp <- function (modelobject) {
-  if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
-    f <- summary(modelobject)$fstatistic
-    p <- pf(f[1],f[2],f[3],lower.tail=F)
-    attributes(p) <- NULL
-    return(p)
-}
-lm_data <- my_data[,c('vic1exta','aoj11','aoj17','pese1','pese2',
-                  'diso7','diso8','diso10','diso14','diso16','diso17',
-                  'diso18','vicbar3')]
-sapply(lm_data, function(x) lmp(lm(x ~ all_pc1$norm)))
-
-```
-
-And then for the binary variables:
-
-```{r}
-log_data <- my_data[,c('vic1ext','vic1hogar',
-                       'vicbar1','vicbar3','vicbar4','vicbar7')]
-log_data <- log_data-1
-log_data$vic44 <- my_data[,'vic44']
-log_data$fear10 <- my_data[,'fear10']
-
-sapply(log_data, function(x) coef(summary(glm(x ~ all_pc1$norm,family=binomial(logit))))[2,4])
-```
-
-Finally, let's save ourselves the headache of doing this again:
-
-```{r}
-ids <- c(lapop.2014.GTM$idnum,
-         lapop.2014.HND$idnum,
-         lapop.2014.SLV$idnum)
-output <- data.frame(idnum=ids,fear=all_pc1$norm)
-write.csv(output,'fear.csv')
+library(XLConnect)
 ```
 
 OK. So now we've got a fear index for all three countries. Now we need to get the relevant geographic information for each.
@@ -179,8 +24,8 @@ geo_gtm <- lapop.2014.GTM[,geo]
 geo_hnd <- lapop.2014.HND[,geo] 
 geo_slv <- lapop.2014.SLV[,geo] 
 
-my_geo <- rbind(geo_gtm,geo_hnd,geo_slv)
-my_geo$fear <- all_pc1$norm
+my_geo <- lapop.2014.all[,geo]
+my_geo$fear <- fear_all
 ```
 
 What I want to do now is aggregate by different geographic units and see how much of the variance can be explained by each level of aggregation. First, the country level (`pais`).
@@ -246,4 +91,124 @@ summary(lm(fear~dist_avg,data=geo_hnd))
 
 In Honduras, then, the availability of district-level geolocation lets us explain 30% of the variance in fear.
 
-How can I turn this into a better map of fear across the Northern Triangle? 
+To facilitate mappning, let's roll this up into a data frame that will contain average values of the fear index for each province in the region. Even though this isn't very granular, I have coverage of provinces but not municipalities.
+
+```{r}
+# all this comes from place_names.R:
+# Country
+
+pais_num <- c(2,3,4)
+pais_text <- c('Guatemala','El Salvador','Honduras')
+my_geo$pais_text <- pais_text[match(my_geo$pais,pais_num)]
+
+# Province
+prov_num <- c(1:18,20:22,301:314,401:413,418:422)                              
+prov_text <- c('Guatemala', 'El Progreso', 'Sacatepéquez', 'Chimaltenango', 
+               'Escuintla', 'Santa Rosa', 'Sololá', 'Totonicapán', 
+               'Quetzaltenango', 'Suchitepéquez', 'Retalhuleu', 'San Marcos', 
+               'Huehuetenango', 'Quiché','Baja Verapaz', 'Alta Verapaz', 
+               'Petén', 'Izabal', 'Chiquimula', 'Jalapa', 'Jutiapa', 
+               'Ahuachapan', 'Santa Ana', 'Sonsonate', 'Chalatenango', 
+               'La Libertad','San Salvador', 'Cuscatlan', 'La Paz', 'Cabañas', 
+               'San Vicente', 'Usulutan', 'San Miguel', 'Morazan', 'La Union', 
+               'Francisco Morazán','Comayagua', 'La Paz', 'Cortés', 
+               'Atlántida', 'Colón', 'Yoro', 'Islas de la Bahía', 'Copán', 
+               'Intibucá', 'Lempira', 'Ocotepeque', 'Santa Bárbara', 
+               'El Paraíso', 'Olancho', 'Gracias a Dios', 'Choluteca', 'Valle')
+my_geo$prov_text <- prov_text[match(my_geo$prov,prov_num)]
+
+# Municipality
+muni_num_hnd <- c(101,108,109,201,204,208,209,301,401,402,403,405,406,407,408,
+                  409,501,503,504,505,603,604,701,702,703,704,705,805,902,905,
+                  906,907,1101,1105,1203,1307,1308,1309,1310,1405,1801,1806,
+                  1807,1902,1908,2001,2101,2107,2108,2201,2205)
+muni_num_gtm <- c(101,106,107,108,110,115,116,117,203,301,314,401,413,501,502,
+                  504,509,602,609,701,710,806,901,911,919,920,1001,1006,1013,
+                  1104,1204,1212,1213,1301,1304,1311,1319,1401,1404,1413,1504,
+                  1601,1606,1609,1614,1705,1708,1803,1805,2004,2101,2102,2201,
+                  2202,2211)
+muni_num_slv <- c(30101,30105,30107,30110,30201,30205,30207,30210,30302,30306,
+                  30315,30407,30408,30503,30511,30512,30515,30521,30601,30602,
+                  30604,30607,30608,30610,30613,30614,30617,30618,30619,30702,
+                  30703,30708,30816,30821,30822,30903,30906,31002,31003,31010,
+                  31111,31117,31123,31202,31209,31217,31219,31309,31312,31403,
+                  31408,31416)
+muni_text_hnd <- c('Distrito Central','El Porvenir','San Ignacio','Comayagua',
+                   'Siguatepeque','El Rosario','San Jerónimo','La Paz',
+                   'San Pedro Sula','Choloma','Puerto Cortés','San Manuel',
+                   'Santa Cruz de Yojoa','Villanueva','La Lima','Potrerillos',
+                   'El Porvenir','Tela','La Ceiba','Arizona','Sonaguera',
+                   'Tocoa','Yoro','El Negrito','El Progreso','Morazán',
+                   'Olanchito','José Santos Guardiola','El Paraíso',
+                   'Nueva Arcadia','San José','Intibucá','Candelaria',
+                   'San Juan Guarita','Fraternidad','Arada','Ilama',
+                   'Quimistán','San Pedro Zacapa ','Santa Rosa de Copán',
+                   'Danlí','Yuscarán','Teupasenti','Catacamas','Guayape',
+                   'Brus Laguna','Choluteca','Duyure','Pespire','Nacaome',
+                   'Caridad')
+muni_text_gtm <- c('Guatemala','Chinautla','San Pedro Ayampuc','Mixco',
+                   'San Juan Sacatépequez','Villa Nueva','Villa Canales',
+                   'Petapa','San Agustín Acasaguastlán','Antigua Guatemala',
+                   'Alotenango','Chimaltenango','San Andrés Itzapa',
+                   'Escuintla','Santa Lucía Cotzumalguapa','Siquinalá',
+                   'San José','Barberena','Taxisco','Sololá','Panajachel',
+                   'Santa María Chiquimula','Quetzaltenango',
+                   'Concepción Chiquirichapa','El Palmar','Coatepeque',
+                   'Mazatenango','Santo Domingo Suchitepéquez','Chicacao',
+                   'San Martín Zapotitlán','Comitancillo','Nuevo Progreso',
+                   'El Tumbador','Huehuetenango','Cuilco','La Libertad',
+                   'Colotenango','Santa Cruz Del Quiché','Zacualpa','Nebaj',
+                   'Cubulco','Cobán','Tucurú','San Pedro Carchá','Chahal',
+                   'La Libertad','Dolores','El Estor','Los Amates','Jocotán',
+                   'Jalapa','San Pedro Pinula','Jutiapa','El Progreso','Comapa')
+muni_text_slv <- c('Ahuachapan','El Refugio','Jujutla','San Pedro Puxtla',
+                   'Candelaria De La Frontera','El Porvenir','Metapan',
+                   'Santa Ana','Armenia','Izalco','Sonsonate','Chalatenango',
+                   'Dulce Nombre De Maria','Colon','Santa Tecla',
+                   'Quezaltepeque','San Juan Opico','Tepecoyo','Aguilares',
+                   'Apopa','Cuscatancingo','Ilopango','Mejicanos','Panchimalco',
+                   'San Martin','San Salvador','Soyapango','Tonacatepeque',
+                   'Ciudad Delgado','Cojutepeque','El Carmen','San Cristobal',
+                   'San Pedro Nonualco','Zacatecoluca','San Luis La Herradura',
+                   'Ilobasco','Sensuntepeque','Guadalupe',
+                   'San Cayetano Istepeque','San Vicente','Mercedes Umaña',
+                   'San Dionisio','Usulutan','Ciudad Barrios','Moncagua',
+                   'San Miguel','Sesori','Guatajiagua','Jocoro',
+                   'Concepcion De Oriente','La Union','Santa Rosa De Lima')
+my_geo$muni_text <- NA
+my_geo[my_geo$pais==2,]$muni_text <- muni_text_gtm[match(my_geo[my_geo$pais==2,]$municipio,muni_num_gtm)]
+my_geo[my_geo$pais==3,]$muni_text <- muni_text_slv[match(my_geo[my_geo$pais==3,]$municipio,muni_num_slv)]
+my_geo[my_geo$pais==4,]$muni_text <- muni_text_hnd[match(my_geo[my_geo$pais==4,]$municipio,muni_num_hnd)]
+```
+
+Export this in a format that I'll (hopefully) be able to import into AGOL. 
+
+```{r}
+out_geo <- data.frame(country=my_geo$pais_text,
+                      prov=my_geo$prov_text,
+                      fear_avg=my_geo$prov_avg,
+                      stringsAsFactors = FALSE)
+out_geo <- unique(out_geo) # 53 unique provinces left
+nrow(out_geo[out_geo$country=='Guatemala',]) # 21 of 22 in Guatemala
+nrow(out_geo[out_geo$country=='El Salvador',]) # all 14 in El Salvador
+nrow(out_geo[out_geo$country=='Honduras',]) # all 18 in Honduras
+write.csv(out_geo,file='fear-prov.csv')
+```
+
+Try this with lat/longs also and see how that looks. For now, don't sweat using the Aldeas-level information in Honduras, so that all three countries are comparable.
+
+```{r}
+out_geo2 <- data.frame(country=my_geo$pais_text,
+                      prov=my_geo$prov_text,
+                      muni=my_geo$muni_text,
+                      fear_avg=my_geo$muni_avg,
+                      stringsAsFactors = FALSE)
+out_geo2 <- unique(out_geo2) # 158 unique municipalities left
+
+geocode_txt <- paste(out_geo2$muni,out_geo2$prov,out_geo2$country,sep=", ")
+geo_ll <- ldply(geocode_txt,function(x) geocode(x,output='latlon',source='google'))
+out_geo2 <- cbind(out_geo2,geo_ll)
+write.csv(out_geo2,file='fear-latlong.csv')
+```
+
+**TODO:** It would probably also be useful to include a count of survey responses for each municipality and province. This could also be visualized on the map. 
