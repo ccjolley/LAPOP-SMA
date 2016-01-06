@@ -1,0 +1,138 @@
+---
+title: "stepwise fct"
+author: "calbano"
+date: "January 6, 2016"
+output: html_document
+---
+```{r}
+lapop.2014.SLV <- read.csv("~/Desktop/ElSalvador_Data_LAPOP_americasbarometer_2014.csv")
+lapop.2014.HND <- read.csv("~/Desktop/Honduras_Data_LAPOP_americasbarometer_2014.csv")
+lapop.2014.GTM <- read.csv("~/Desktop/Guatemala_Data_LAPOP_americasbarometer_2014.csv")
+
+names.slv = names(lapop.2014.SLV)
+names.hnd = names(lapop.2014.HND)
+names.gtm = names(lapop.2014.GTM)
+```
+
+```{r}
+setwd("/Users/christiealbano/Desktop")
+source("make_indices.R") #fear_hnd, fear_gtm, fear_slv
+```
+
+```{r}
+n_fear_more <- c(fear_common,'vic40','vic41','vic43','vic45','fear6f')
+n_ca_common <- c('cp5','cp7','cp8','cp13','cp20')
+n_ca_more <- c(n_ca_common,'honcp22','honcp21a','cp21')
+n_pv_gtm <- c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f',
+            'pv2g','pv2h','pv2i','pv2j','pv2k')
+n_ex_common <- c('exc2','exc6','exc20','exc11','exc13','exc14',
+               'exc15','exc16','exc7')
+n_tr_more <- c(tr_common,'pr4','m1','b11','esb48','epp1','epp3','pr4',
+             'epn3a','epn3b','epn3c','b11','b37','b14','b15','b19',
+             'b46','honb51','venb11','venhonb51',
+             'venhonvb10','epp1','epp3','aoj18')
+n_w_more <- c(w_common,'inf3a')
+n_aut_hnd <- c('dem2','dem11','aut1','jc13','jc10','jc15a',
+             'jc16a','honjc17')
+n_aut_common <- c('dem2','dem11','jc13','jc10','jc15a')
+n_geo_more <- c('pais','estratopri','estratosec','upm','prov','municipio',
+              'cluster','tamano','hondistrito')
+n_dont_use <- c('idnum','fecha','wt','uniq_id','nationality','vb3n','vb11',
+              'leng1')
+
+used <- unique(c(n_fear_more,n_ca_more,n_pv_gtm,n_ex_common,n_tr_more,
+                 n_w_more,crit_common,n_aut_hnd,n_geo_more,n_dont_use))
+
+unused_common <- names(lapop.2014.all)[!(names(lapop.2014.all) %in% used)]
+unused_gtm <- names(lapop.2014.GTM)[!(names(lapop.2014.GTM) %in% used) & 
+                                    !(names(lapop.2014.GTM) %in% unused_common)]
+unused_gtm[30:32] = c('vb3n', 'vb11', 'leng1')
+unused_slv <- names(lapop.2014.SLV)[!(names(lapop.2014.SLV) %in% used) & 
+                                      !(names(lapop.2014.SLV) %in% unused_common)]
+unused_slv[50:52] = c('vb3n', 'vb11', 'leng1')
+unused_hnd <- names(lapop.2014.HND)[!(names(lapop.2014.HND) %in% used) & 
+                                      !(names(lapop.2014.HND) %in% unused_common)]
+unused_hnd[41:43] = c('vb3n', 'vb11', 'leng1')
+```
+
+```{r}
+# Assume a function is binary if only two responses are present
+is_binary <- function(data,var) {
+  u <- unique(data[,var])
+  length(u[u<888888]) == 2
+}
+
+bin_common <- unused_common[sapply(unused_common,function(x) 
+  is_binary(lapop.2014.all,x))]
+bin_gtm <- unused_gtm[sapply(unused_gtm,function(x) 
+  is_binary(lapop.2014.GTM,x))]
+bin_slv <- unused_slv[sapply(unused_slv,function(x) 
+  is_binary(lapop.2014.SLV,x))]
+bin_hnd <- unused_hnd[sapply(unused_hnd,function(x) 
+  is_binary(lapop.2014.HND,x))]
+
+# Note that, while the indicators vb3n, vb11, and leng1 are used in all three
+# countries, the answers are country-specific and shouldn't be used as 
+# regional indicators.
+unord_common <- c('idiomaq','a4','vic2','vic2aa','aoj22','env1','vb1',
+                  'vb4new','vb101','vb20','for1n','for4',
+                  'for5','q3c','ocup4a','ocup1a','q11n','etid')
+ord_common <- unused_common[!(unused_common %in% bin_common) &
+                            !(unused_common %in% unord_common)]
+unord_gtm <- c('aoj21','chipart107n','parclien','guaetid2n','leng4','vb3n','vb11','leng1')
+ord_gtm <- unused_gtm[!(unused_gtm %in% bin_gtm) &
+                        !(unused_gtm %in% unord_gtm)]
+unord_slv <- c('esexc16a','elsvb48','pr1','vb3n','vb11')
+ord_slv <- unused_slv[!(unused_slv %in% bin_slv) &
+                        !(unused_slv %in% unord_slv)]
+unord_hnd <- c('dst1','vb3n','vb11','leng1')
+ord_hnd <- unused_hnd[!(unused_hnd %in% bin_hnd) &
+                              !(unused_hnd %in% unord_hnd)]
+```
+
+### HONDURAS (unused) ###
+```{r}
+hnd = as.numeric(length(unused_hnd))
+for (i in 1:length(unused_hnd)) {
+  hnd[i] = paste("lapop.2014.HND", unused_hnd[i], sep = "$")  
+}
+
+hnd.values = paste(hnd, collapse = "+") #I copied and pasted hnd.values (but removed the quotes) and added it to the scope of the step function
+
+unord_hnd #need to make a factor in the scope 
+
+line.none = lm(fear_hnd~1, data = lapop.2014.HND)
+line.all = lm(fear_hnd~lapop.2014.HND$muni10+lapop.2014.HND$honmun30+lapop.2014.HND$honmuni31+lapop.2014.HND$honmun32+lapop.2014.HND$honmun33+lapop.2014.HND$honmun36+lapop.2014.HND$honmun37+lapop.2014.HND$honmun38+lapop.2014.HND$honmun39+lapop.2014.HND$honmun40+lapop.2014.HND$honmun41+lapop.2014.HND$honmun42+lapop.2014.HND$cpss1+lapop.2014.HND$prot4+lapop.2014.HND$prot7+lapop.2014.HND$ico2+lapop.2014.HND$mil1+lapop.2014.HND$mil2+lapop.2014.HND$pr3d+lapop.2014.HND$pr3e+lapop.2014.HND$honqt1+lapop.2014.HND$honqt2+lapop.2014.HND$honqt3+lapop.2014.HND$honqt4+lapop.2014.HND$honqt5+lapop.2014.HND$honqt6+lapop.2014.HND$honqt7+lapop.2014.HND$honqt8+lapop.2014.HND$honqt9+lapop.2014.HND$honqt10+lapop.2014.HND$honqt11+lapop.2014.HND$honqt12+lapop.2014.HND$m2+lapop.2014.HND$honm3+lapop.2014.HND$coer1+lapop.2014.HND$ros1+as.factor(lapop.2014.HND$dst1)+lapop.2014.HND$per4+lapop.2014.HND$per9+lapop.2014.HND$exc18+as.factor(lapop.2014.HND$vb3n)+ as.factor(lapop.2014.HND$vb11)+ as.factor(lapop.2014.HND$leng1) + tr_hnd + w_hnd + crit_hnd + aut_hnd + ex_hnd + ca_hnd)
+
+### Forward Selection
+step(line.none, scope = ~lapop.2014.HND$muni10+lapop.2014.HND$honmun30+lapop.2014.HND$honmuni31+lapop.2014.HND$honmun32+lapop.2014.HND$honmun33+lapop.2014.HND$honmun36+lapop.2014.HND$honmun37+lapop.2014.HND$honmun38+lapop.2014.HND$honmun39+lapop.2014.HND$honmun40+lapop.2014.HND$honmun41+lapop.2014.HND$honmun42+lapop.2014.HND$cpss1+lapop.2014.HND$prot4+lapop.2014.HND$prot7+lapop.2014.HND$ico2+lapop.2014.HND$mil1+lapop.2014.HND$mil2+lapop.2014.HND$pr3d+lapop.2014.HND$pr3e+lapop.2014.HND$honqt1+lapop.2014.HND$honqt2+lapop.2014.HND$honqt3+lapop.2014.HND$honqt4+lapop.2014.HND$honqt5+lapop.2014.HND$honqt6+lapop.2014.HND$honqt7+lapop.2014.HND$honqt8+lapop.2014.HND$honqt9+lapop.2014.HND$honqt10+lapop.2014.HND$honqt11+lapop.2014.HND$honqt12+lapop.2014.HND$m2+lapop.2014.HND$honm3+lapop.2014.HND$coer1+lapop.2014.HND$ros1+as.factor(lapop.2014.HND$dst1)+lapop.2014.HND$per4+lapop.2014.HND$per9+lapop.2014.HND$exc18+as.factor(lapop.2014.HND$vb3n)+ as.factor(lapop.2014.HND$vb11)+ as.factor(lapop.2014.HND$leng1) + tr_hnd + w_hnd + crit_hnd + aut_hnd + ex_hnd + ca_hnd, direction = "forward", data = lapop.2014.HND)
+
+## Backward Selection
+step(line.all, direction = "backward", data = lapop.2014.HND)
+```
+
+## Model selected from stepwise Function ## 
+```{r}
+##Forward Selection 
+hnd.model = lm(fear_hnd ~ lapop.2014.HND$honmun32 + tr_hnd + lapop.2014.HND$honqt8 + 
+    lapop.2014.HND$honmun33 + aut_hnd + ca_hnd + lapop.2014.HND$honqt3 + 
+    lapop.2014.HND$honqt12 + lapop.2014.HND$honqt1 + lapop.2014.HND$honmun30 + 
+    lapop.2014.HND$prot7 + w_hnd + as.factor(lapop.2014.HND$leng1) + 
+    lapop.2014.HND$pr3d + lapop.2014.HND$honmun36 + lapop.2014.HND$exc18, 
+    data = lapop.2014.HND)
+
+summary(hnd.model) #R^2 = 0.177, pvalue < 2.2e-16
+
+##Backward Selection
+
+hnd.model2 = lm(fear_hnd ~ lapop.2014.HND$honmun30 + lapop.2014.HND$honmun32 + 
+    lapop.2014.HND$honmun33 + lapop.2014.HND$honmun36 + lapop.2014.HND$honmun40 + 
+    lapop.2014.HND$honmun41 + lapop.2014.HND$prot7 + lapop.2014.HND$pr3d + 
+    lapop.2014.HND$honqt1 + lapop.2014.HND$honqt3 + lapop.2014.HND$honqt8 + 
+    lapop.2014.HND$honqt10 + lapop.2014.HND$honqt12 + lapop.2014.HND$exc18 + 
+    as.factor(lapop.2014.HND$leng1) + tr_hnd + w_hnd + aut_hnd + 
+    ca_hnd)
+summary(hnd.model2) #R^2 = 0.18, pvalue < 2.2e-16
+```
+
+P-values and R^2 values are nearly the same thus both model selection techniques produce nearly the same results. This method of model selection leaves more variables in the model than our prior approach did. 
