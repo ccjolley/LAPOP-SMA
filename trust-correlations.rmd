@@ -109,6 +109,218 @@ pvalue(trust_gtm, lapop.2014.GTM, 'q12c')
 pvalue(trust_gtm, lapop.2014.GTM, 'q12bn')
 pvalue(trust_gtm, lapop.2014.GTM, 'q12') 
 ```
+
+Onto examining which variables that correlate with our Trust Index also correlate with each other.
+```{r}
+bin_bin <- function(data,var1,var2) {
+  v1 <- data[data[,var1] < 1000 & data[,var2] < 1000,var1]
+  v2 <- data[data[,var1] < 1000 & data[,var2] < 1000,var2]
+  ct <- table(v1,v2)
+  ft <- fisher.test(ct)
+  c(ft$p.value,ft$estimate)
+}
+gtm_bin <- c('ur','wf1','cct1b','sexi')
+for (x in gtm_bin) {
+  for (y in gtm_bin[-1:-which(gtm_bin==x)]) {
+    res <- bin_bin(lapop.2014.GTM,x,y)
+    if (res[1] < 0.01) {
+      print(paste(x,y,res[1],res[2]))
+    }
+  }
+}
+```
+Positive Correlations:
+* `ur`and `cct1b`: Urban people more likely to be household beneficiaries of conditional cash transfers.
+* `ur`and `sexi`: More female interviewers in rural areas (perhaps, explains why people interviewed by women were more trustful).
+
+Negative Correlations:
+* `wf1`and `cct1b`: People not receiving government assistance, were most likely not household beneficiaries of conditional cash transfers (that should be a no brainer, though).
+
+How about a the correlations between binary and continuous variables?
+
+```{r}
+bin_cont <- function(data,bvar,cvar) {
+  b <- data[data[,bvar] < 1000 & data[,cvar] < 1000,bvar]
+  b <- b - min(b) 
+  c <- data[data[,bvar] < 1000 & data[,cvar] < 1000,cvar]  
+  tt <- t.test(c[b==0],c[b==1])
+  c(tt$p.value,tt$estimate[2]-tt$estimate[1])
+}
+gtm_cont <- c('pole2n','aoj12','mil3','sd3new2','infrax','eff1','eff2','mil7',
+              'per9','dem2','pol1','vb20','for6b','mil10e','q5b','q2y','q2','soct2','ed')
+for (x in gtm_bin) {
+  for (y in gtm_cont) {
+    res <- bin_cont(lapop.2014.GTM,x,y)
+    if (res[1] < 0.01) {
+      print(paste(x,y,res[1],res[2]))
+    }
+  }
+}
+```
+This doesn't seem to have been a clean process, since there was an error message indicating 'not enough x variables'. I would like to press the 'help' button here, so as to revise it. Thus far, these are the results that I managed to pull:
+
+Positive Correlations:
+* `ur`and `for6b`: Urban people more likely to believe that US is influential
+
+Negative Correlations:
+* `ur`and `infrax`: Shorter police response times in urban areas
+* `ur`and `vb20`: Urban people less likely to vote
+* `ur`and `mil3`: Urban people less likely to trust US Armed Forces
+
+Finally, correlations between continuous variables.
+```{r}
+cont_cont <- function(data,var1,var2) {
+  v1 <- data[data[,var1] < 1000 & data[,var2] < 1000,var1]
+  v2 <- data[data[,var1] < 1000 & data[,var2] < 1000,var2]
+  reg <- lm(v1~v2)
+  summary(reg)$coefficients[2,c(1,4)]
+}
+for (x in gtm_cont) {
+  for (y in gtm_cont[-1:-which(gtm_cont==x)]) {
+    res <- cont_cont(lapop.2014.GTM,x,y)
+    if (res[2] < 0.01) {
+      print(paste(x,y,res[2],res[1]))
+    }
+  }
+}
+```
+Once again, not smooth...but:
+
+Positive Correlations:
+* `pole2n`and `aoj12`: Dissatisfied people less confident in judiciary punishing the guilty
+* `pole2n`and `sd3new2`: People dissatisfied with police performance are also dissatisfied with public schools
+* `pole2n`and `infrax`: Longer police response times are correlated to dissatisfaction with police performance
+
+Negative Correlations:
+* `pole2n`and `eff1`: People dissatisfied with police performance are less likely to believe that leaders are interested in what people think.
+
+To recap: There is an overall coherent set of thinking here as well, that links dissatisfaction with police (`pole2n`), long police response times (`infrax`), dissatisfaction with public schools (`sd3new2`), and lack of confidence in judiciary (`aoj12`) and lack of trust in government. 
+It is interesting to note the link between satisfaction in police performance, and the overall confidence in leaders interest in what people think (`eff1`), which makes me wonder if this has anything to do with people's perception of safety, and the responsibility of politicians to act upon it. 
+
+Likewise, US involvement (`for6b`and `mil3`) also play a role in increasing distrust towards the government; this is more marked in urban areas.
+
+Note that people in rural areas (`ur`=2) were more trustful of government, and it was precisely in rural areas where there were more women interviewers (`sexi`=2). This also makes me wonder if the men interviewers were sent to the worst urban areas.
+
+```{r}
+gtm <- lapop.2014.GTM
+gtm[gtm > 5000] <- NA
+gtm$trust_idx <- trust_gtm
+summary(lm(trust_gtm ~ gtm$ur + gtm$sexi))
+```
+
+```{r}
+summary(lm(trust_gtm ~ gtm$ur + gtm$cct1b + gtm$wf1 + gtm$sexi + gtm$pole2n + 
+             gtm$aoj12 + gtm$for6b + gtm$infrax + gtm$sd3new2 + gtm$eff1 + 
+             gtm$vb20 + gtm$mil3))
+```
+With a strict (p < 0.01) criterion, the only significant correlations left are urbanization, male interviewers/female interviewers, satisfaction with police, confidence in judiciary, police response time, satisfaction with public schools, confidence in leaders listening to what people think, and **interestingly enough**, trust in US Military. 
+
+```{r}
+nrow(na.omit(gtm[,c(gtm_bin,gtm_cont)])) / nrow(gtm)
+```
+We've got 59.5% of our data included in this multiple regression. 
+
+What are the correlations with all the unordered continuous variables? I'll be adding `dvw1`and `dvw2`to the list, since domestic violence is a topic that often comes up in the tweets from Central America. 
+```{r}
+categ <- function(f,x,categ) {
+  # For a data from f with a continuous variable 'x' and an unordered 
+  # categorical variable 'categ', test whether the value of x is 
+  # significantly higher or lower for each value of categ than for the
+  # rest of the population. Do this using a two-sample t-test.
+  result <- data.frame(var=character(),val=integer(),pval=double(),
+                       mean=double(),othermean=double())
+  for(q in unique(na.omit(f[,categ]))) {
+    if(sum(f[,categ]==q,na.rm=TRUE) > 1) {
+      yes <- f[f[,categ]==q,x]
+      no <- f[f[,categ]!=q,x]
+      if (sum(!is.na(no)) < 2) return()
+      tt <- t.test(yes,no,na.rm=TRUE)
+      if (tt$p.value < 0.01) {
+        newrow <- data.frame(var=categ,val=q,pval=tt$p.value,
+                         mean=tt$estimate[[1]],
+                         othermean=tt$estimate[[2]])
+        result <- rbind(result,newrow)
+      }
+    }
+  }
+  result
+}
+unordered_vars <- c('a4','vic2','vic2aa','vb3n','vb4new','vb101','vb11',
+                    'for1n','for4','for5','q3c','ocup4a','ocup1a','q11n',
+                    'etid','leng1','dvw1','dvw2')
+categ(gtm,'trust_idx','a4') #People complaning about poverty and lack of water are more trustful, people complaining about discrimination are less so
+categ(gtm,'trust_idx','vic2')#People that suffered from an armed robbery are less trustful, contrary to those who suffered from an unarmed robbery, no assaul or physical threats
+categ(gtm,'trust_idx','vic2aa')#People victimized in their own neighborhood are more trustful, in general (quality of crime?) 
+categ(gtm,'trust_idx','vb3n') #People who voted other, null, or for Nobel Peace Prize winner, Rigoberta Menchu's, coalition are less trustful
+categ(gtm,'trust_idx','vb4new') #Those claiming confusion as the reason for not voting are more trustful
+categ(gtm,'trust_idx','vb101')#Nada 
+categ(gtm,'trust_idx','vb11') #People identified with Partido Patriota are more trustful (after Sep. 2015, this should have changed, I'm assuming). Those identified with 'other' less trustful.
+categ(gtm,'trust_idx','for1n') #Those believing US is more influential are less trustful, those believing Japan is more influential are more trustful
+categ(gtm,'trust_idx','for4') #Those believing that the US will lead the region are less trustful, those believing that Japan or Mexico will lead the region are more trustful. 
+categ(gtm,'trust_idx','for5') #Ah! Those preferring Japan's model are more trustful, those who opted for none/prefer own model are less trustful
+categ(gtm,'trust_idx','q3c') #Protestants less trustful/Evangelicals more trustful
+categ(gtm,'trust_idx','ocup4a')#Employed are more trustful 
+categ(gtm,'trust_idx','ocup1a')#Nada
+categ(gtm,'trust_idx','q11n') #Nope
+categ(gtm,'trust_idx','etid') #Zilch
+categ(gtm,'trust_idx','leng1') #Spanish speakers are more trustful, Qeqchi speakers less trustful 
+categ(gtm,'trust_idx','dvw1')#Those not approving nor understanding of husband hitting wife for neglecting chores are less trustful. Those not approving but understanding of husband hitting wife for neglecting chores are more trustful.
+categ(gtm,'trust_idx','dvw2')#Those not approving nor understanding of husband hitting wife for being unfaithful are less trustful. Those not approving but understanding of husband hitting wife for being unfaithful are more trustful
+
+gtm$a4_4 <- as.numeric(gtm$a4==4)
+gtm$a4_19 <- as.numeric(gtm$a4==19)
+gtm$a4_25 <- as.numeric(gtm$a4==25)
+gtm$vic2_3 <- as.numeric(gtm$vic2==3)
+gtm$vic2_1 <- as.numeric(gtm$vic2==1)
+gtm$vic2aa_2 <- as.numeric(gtm$vic2aa==2)
+gtm$vb3n_77 <- as.numeric(gtm$vb3n==77)
+gtm$vb3n_97 <- as.numeric(gtm$vb3n==97)
+gtm$vb3n_210 <- as.numeric(gtm$vb3n==210)
+gtm$vb4new_1 <- as.numeric(gtm$vb4new==1)
+gtm$vb11_206 <- as.numeric(gtm$vb11==206)
+gtm$vb11_77 <- as.numeric(gtm$vb11==77)
+gtm$for1n_4 <- as.numeric(gtm$for1n==4)
+gtm$for1n_2 <- as.numeric(gtm$for1n==2)
+gtm$for4_4 <- as.numeric(gtm$for4==4)
+gtm$for4_2 <- as.numeric(gtm$for4==2)
+gtm$for4_7 <- as.numeric(gtm$for4==7)
+gtm$for5_13 <- as.numeric(gtm$for5==13)
+gtm$for5_2 <- as.numeric(gtm$for5==2)
+gtm$q3c_2 <- as.numeric(gtm$q3c==2)
+gtm$q3c_5 <- as.numeric(gtm$q3c==5)
+gtm$ocup4a_1 <- as.numeric(gtm$ocup4a==1)
+gtm$leng1_201 <- as.numeric(gtm$leng1==201)
+gtm$leng1_207 <- as.numeric(gtm$leng1==207)
+gtm$dvw1_3 <- as.numeric(gtm$dvw1==3)
+gtm$dvw1_2 <- as.numeric(gtm$dvw1==2)
+gtm$dvw2_3 <- as.numeric(gtm$dvw2==3)
+gtm$dvw2_2 <- as.numeric(gtm$dvw2==2)
+
+cat_var <- c('a4_4','a4_19','a4_25','vic2_3','vic2_1',
+             'vic2aa_2','vb3n_77','vb3n_97','vb3n_210','vb4new_1',
+             'vb11_206','vb11_77','for1n_4','for1n_2','for4_4','for4_2','for4_7','for5_13','for5_2','q3c_2','q3c_5','ocup4a_1','leng1_201','leng1_207','dvw1_3','dvw1_2','gtm$dvw2_3','gtm$dvw2_2')
+
+for (x in cat_var) {
+  s <- lm(trust_gtm ~ gtm$ur + gtm$wf1 + gtm$cct1b + gtm$sexi + gtm$for6b + 
+             gtm$infrax + gtm$vb20 + gtm$mil3 + gtm$pole2n + gtm$aoj12 + 
+             gtm$sd3new2 + gtm$eff1 + gtm[,x])
+  res <- summary(s)$coefficient[nrow(summary(s)$coefficient),c(4,1)]
+  if (res[1] < 0.01) {
+    print(paste(c(x,res)))
+  }
+}
+```
+At a strict p < 0.01, `a4_25`, `vic2aa_2`, `vb11_77`, `for4_7`, `for5_13`, and `dvw1_2`are significant. At the p < 0.05 level,`vic2_3`, `vic2_1`, `vb3n_97`, `vb4new_1`, `vb11_206`, `for4_4`, `for5_2`, `leng1_201`, `leng1_207`, and `dvw1_3`are also interesting. 
+
+```{r}
+summary(lm(trust_gtm ~ gtm$ur + gtm$wf1 + gtm$cct1b + gtm$sexi + gtm$for6b + 
+             gtm$infrax + gtm$vb20 + gtm$mil3 + gtm$pole2n + gtm$aoj12 + 
+             gtm$sd3new2 + gtm$eff1 + gtm$a4_25 + gtm$vic2aa_2 + gtm$vb11_77 + gtm$for4_7 + gtm$for5_13 + gtm$dvw1_2))
+```
+
+The most significant variables to take away here: US influence, dissatisfaction with police, lack of confidence in the judicial, victimization in the neigborhood, domestic violence, and lack of identification with a political party.
+There are some out of these that address impunity and security, that could be very relevant to our social media analyses, where fear and violence is concerned.
+
 ###El Salvador###
 ##Binary##
 ```{r}
@@ -156,5 +368,290 @@ pvalue(trust_slv, lapop.2014.SLV, 'q12c')
 pvalue(trust_slv, lapop.2014.SLV, 'q12bn')
 pvalue(trust_slv, lapop.2014.SLV, 'q12')
 ```
+Same procedure: how do our significant variables correlate with one another? First, the binaries:
+```{r}
+bin_bin <- function(data,var1,var2) {
+  v1 <- data[data[,var1] < 1000 & data[,var2] < 1000,var1]
+  v2 <- data[data[,var1] < 1000 & data[,var2] < 1000,var2]
+  ct <- table(v1,v2)
+  ft <- fisher.test(ct)
+  c(ft$p.value,ft$estimate)
+}
+slv_bin <- c('ur','vb2','vb10','wf1','cct1b','q14')
+for (x in gtm_bin) {
+  for (y in gtm_bin[-1:-which(gtm_bin==x)]) {
+    res <- bin_bin(lapop.2014.GTM,x,y)
+    if (res[1] < 0.01) {
+      print(paste(x,y,res[1],res[2]))
+    }
+  }
+}
+```
+Positive Correlations:
+* `ur`and `sexi`: Most women interviewers were in rural areas.
+* `cct1b`and `wf1`: Those not benefiting from government assistance also did not receive conditional transfers. (No brainer)
+
+Negative Correlations:
+* `ur`and `cct1b`: Most household beneficiaries of conditional cash transfers are urban.
+
+Correlations between Binaries and Continuous:
+```{r}
+bin_cont <- function(data,bvar,cvar) {
+  b <- data[data[,bvar] < 1000 & data[,cvar] < 1000,bvar]
+  b <- b - min(b) 
+  c <- data[data[,bvar] < 1000 & data[,cvar] < 1000,cvar]  
+  tt <- t.test(c[b==0],c[b==1])
+  c(tt$p.value,tt$estimate[2]-tt$estimate[1])
+}
+slv_cont <- c('ico2','pole2n','aoj12','mil3','sd3new2','infrax','ing4','eff1',
+              'eff2','mil7','pol1','vb20','mil10a','mil10e','q5b','idio2','soct2','ed')
+for (x in slv_bin) {
+  for (y in slv_cont) {
+    res <- bin_cont(lapop.2014.SLV,x,y)
+    if (res[1] < 0.01) {
+      print(paste(x,y,res[1],res[2]))
+    }
+  }
+}
+```
+Woah! It seems like we've got a wealth of correlations here!
+
+Positive Correlations:
+* `ur`and `infrax`: Faster police response time in urban areas.
+* `ur`and `eff2`: Urban people are more likely to understand important political issues.
+* `ur`and `pol1`: Urban people more interested in politics.
+* `ur`and `mil10a`: Urban people more likely to trust China.
+* `ur`and `ed`: Urban people more likely to be more educated.
+* `vb2`and `ing4`: Voters more likely to prefer democracy over any other system.
+* `vb2`and `eff2`: Voters more likely to feel that they understand the most important issues.
+* `vb10`and `pol1`: Those not identified with a political party are less likely to be interested in politics.
+* `vb10`and `idio2`: Those not identified with a political party are more likely to perceive their personal economic situation to worsen.
+* `vb10`and `soct2`: Those not identified with a political party are more likely to perceive their country's economic situation to worsen.
+* `vb10`and `ed`: People identified with a political party are more likely to be more educated.
+* `q14`and `mil3`: Those with the intention of moving to another country are more trusting of the US Military (interesting! Could this be from the overall perception of the US or from the intention of serving in the US Military?)
+* `q14`and `pol1`: Those with the intention of moving to another country are least interested in politics.
+* `q14`and `mil10e`: Those with the intention of moving to another country are more trusting of the US (here is one answer!)
+
+Negative Correlations:
+* `ur`and `ico2`: Less frequency of police patrols in rural areas.
+* `ur`and `pole2n`: More satisfaction with police performance in rural areas (a bit counterintuitive, unless my reading is wrong!)
+* `ur`and `aoj12`: Urban people are less confident that judiciary will punish guilty.
+* `ur`and `eff1`: Urban people are less likely to believe that leaders are interested in what people think.
+* `vb2`and `pol1`: Voters more likely to be interested in politics. 
+* `vb2`and `vb20`: Voters more likely to return to the ballot box during next presidential election (if held next week).
+* `vb10`and `mil3`: Those not identifying with a political party are less likely to trust the US Military.
+* `vb10`and `ing4`: Those not identified with a political party are less likely to prefer democracy over any other system.
+* `vb10`and `eff1`: Those not identified with a political party are less likely to believe that leaders are interested in what people think.
+* `vb10`and `eff2`: Those not identified with a political party are less likely to understand most important political issues. 
+* `vb10`and `mil7`: Those not identified with a political party disagree with Armed Forces participating in combating crime and violence.
+* `vb10`and `vb20`: Those not identified with a political party less likely to vote during next presidential elections (if held next week)
+* `vb10`and `mil10a`: Those identified with a political party are more likely to trust China.
+* `vb10`and `mil10e`: Those identified with a political party are more likely to trust the United States.
+* `wf1`and `ed`: Less educated people are more likely to receive government assistance
+* `cct1b`and `ed`: Less educated people are more likely to be household beneficiaries of conditional cash transfers
+* `q14`and `pole2n`: Those with the intention of moving to another country are more likely dissatisfied with police performance.
+* `q14`and `aoj12`: Those with the intention of moving to another country are less confident in judiciary punishing the guilty.
+* `q14`and `eff2`: Those with the intention of moving to another country are less likely to understand most important political issues
+* `q14`and `ed`: Those with the intention of moving to another country are less educated.
+
+Interesting things to take note of in regards to the profile of these individuals: education, urbanization, intention to move to another country, trust in judiciary and satisfaction with police performance (impunity markers) are relevant to how much people trust the government, and how it molds their perception of external parties, such as the US and China. There also seems to be indicators here pointing to how certain people prioritize their economic stability over all other things, including politics.
+
+What do continuous variables tell us?
+
+```{r}
+cont_cont <- function(data,var1,var2) {
+  v1 <- data[data[,var1] < 1000 & data[,var2] < 1000,var1]
+  v2 <- data[data[,var1] < 1000 & data[,var2] < 1000,var2]
+  reg <- lm(v1~v2)
+  summary(reg)$coefficients[2,c(1,4)]
+}
+for (x in slv_cont) {
+  for (y in slv_cont[-1:-which(slv_cont==x)]) {
+    res <- cont_cont(lapop.2014.SLV,x,y)
+    if (res[2] < 0.01) {
+      print(paste(x,y,res[2],res[1]))
+    }
+  }
+}
+```
+It seriously feels like I have been hitting the jackpot here! (If only that was true for my trips to Vegas...)
+
+Positive Correlations:
+* `ico2`and `pole2n`: The less frequency of police patrols, the more people are dissatisfied with police.
+* `ico2`and `aoj12`: The less frequency of police patrols, the less people are confident on judiciary punishing the guilty.
+* `ico2`and `sd3new2`: The less frequency of police patrols, the more people are dissatified with public schools.
+* `ico2`and`infrax`: Less frequency of police patrols, longer police response times.
+* `ico2`and `soct2`: The less frequency of police patrols, the more people believe country's economic situation to worsen.
+* `pole2n`and `aoj12`: More dissatisfaction with police, less confidence in judiciary punishing the guilty.
+* `pole2n`and `sd3new2`: More dissatisfaction with police, more dissatisfaction with public schools.
+* `pole2n`and `infrax`: People dissatisfied with police also complain about long police response times.
+* `pole2n`and `idio2`: People dissatisfied with police believe their personal economic situation is getting worse.
+* `pole2n`and `soct2`: People dissatisfied with police percieve their country's economic situation is getting worse.
+* `pole2n`and `ed`: People dissatisfied with police are also more likely to be more educated. (Most likely correlated to the 'urban' factor.)
+* `aoj12`and `infrax`: Those least confident in judiciary punishing the guilty also complain about long police response times.
+* `aoj12`and `q5b`: Those least confident in judiciary punishing the guilty are also the least religious.
+* `aoj12` and `soct2`: Those least confident in judiciary punishing the guilty also perceive country's economy getting worse.
+* `aoj12`and `ed`: Those least confident in judiciary punishing the guilty are also more educated.
+* `mil3`and `ing4`: People that trust the US Military also prefer democracy over any other system.
+* `mil3`and `eff1`: People that trust the US Military are more likely to believe that leaders are interested in what people think.
+* `mil3`and `eff2`: People that trust the US Military are more likely to feel that they understand the most important issues. 
+* `mil3`and `mil3`: People that trust the US Military are more likely to support military involvement in combating crime and violence.
+* `mil3`and `vb20`: People that trust the US Military are more likely to vote.
+* `sd3new2`and `infrax`: Those dissatisfied with public schools also complain about long police response times.
+* `sd3new2`and `q5b`: Those dissatisfied with public schools are less religious.
+* `sd3new2`and `idio2`: Those dissatisfied with public schools perceive personal economic situation getting worse.
+* `sd3new2`and `soct2`: Those dissatisfied with public schools perceive national economy getting worse.
+* `sd3new2`and `ed`: Those dissatisfied with public schools are more educated.
+* `infrax`and `idio2`: Those complaining about long police response times perceive personal economic situation getting worse.
+* `ing4`and`eff1`: Those who prefer democracy also believe that leaders are interested in what people think.
+* `ing4`and `eff2`: Those who prefer democracy also feel that they understand the most important political issues.
+* `ing4`and `mil7`: Those who prefer democracy also agree with military intervention in fight against crime and violence.
+* `ing4`and `ed`: Those who prefer democracy are more educated.
+* `eff1`and `eff2`: Those who believe that leaders are interested in what people think also feel that they understand the most important political issues.
+* `eff1`and `mil7`: Those who believe that leaders are interested in what people think also agree with military intervention in combat against crime and violence.
+* `eff1`and `pol1`: Those who believe that leaders are interested in what people think are interested in politics.
+* `pol1`and `mil10a`: Those least interested in politics trust the US more.
+* `vb20`and `idio2`: Voters have a negative perception of their personal economic situation.
+* `vb20`and `soct2`: Voters have a negative perception of national economy.
+* `mil10a`and `mil10e`: Those who trust China also trust the US.
+* `mil10a`and `soct2`: Those who trust China have a negative perception of the national economy.
+* `mil10a`and `idio2`: Those who trust China have a negative perception of their personal economic situation.
+* `mil10a`and `q5b`: Those who trust China are less religious.
+* `q5b`and `ed`: Least religious people are more educated.
+* `idio2`and `soct2`: People with a negative perception of personal economic situation are also negative about national economy. 
+
+Negative Correlations:
+* `ico2`and `ing4`: Less frequency of police patrols, the less people prefer democracy over all systems (interesting for the authoritarianism index! There may be a question of security here!).
+* `ico2`and `eff1`: The less frequency of police patrols, the less people believe that leaders are interested in what people think.
+* `pole2n`and `eff1`: People dissatisfied with police are less likely to believe that leaders are interested in what people think.
+* `aoj12`and `mil3`: Those least confident in judiciary punishing the guilty are also less trusting of the US Military.
+* `aoj12`and `sd3new2`: Those least confident in judiciary punishing the guilty are also dissatisfied with public schools.
+* `aoj12`and `eff1`: Those least confident in judiciary punishing the guilty are less likely ot believe that leaders are interested in what people think.
+* `mil3`and`mil10e`: People that trust the US Military are less likely to trust the United States. (Interesting!)
+* `mil3`and `q5b`: People that trust the US Military are less likely to be religious. 
+* `sd3new2`and `eff1`: Those dissatisfied with public schools do not believe that leaders are interested in what people think.
+* `infrax`and `eff1`: Those complaining about long police response times also do not believe that leaders are interested in what people think.
+* `ing4`and `pol1`: Those who prefer democracy are also interested in politics.
+* `ing4`and `mil10a`: Those who prefer democracy are also less likely to trust China.
+* `ing4`and `soct2`: Those who prefer democracy have a positive perception of the national economy.
+* `ing4`and `idio2`: Those who prefer democracy have a positive perception of their personal economic situation.
+* `eff1`and `vb20`: Those who believe that leaders are interested in what people think are less likely to vote (?).
+* `eff1`and `idio2`: Those who believe that leaders are interested in what people have a positive perception of personal economic situation. 
+* `eff1`and `soct2`: Those who believe that leaders are interested in what people have a positive perception of national economy. 
+* `eff1`and `ed`: Those who believe that leaders are interested in what people are less educated.
+* `mil7`and `mil10e`: Those who agree with military involvement in combat against crime and violence are less trusting of the US.
+* `pol1`and `vb20`: Those not interested in politics are less likely to vote.
+* `pol1`and `ed`: Those not interested in politics are less educated.
+* `mil10a`and `ed`: Those who trust China are more likely to be less educated.
+* `q5b`and `soct2`: Least religious people have a postive perception of national economy.
+* `q5b`and `idio2`: Least religious people have a positive perception of personal economic situation.
+* `idio2`and `ed`: People with a negative perception of personal economic situation are less educated. 
+* `soct2`and `ed`: People with a negative perception of national economy are less educated. 
+
+Despite, the diversity in opinion, there is a sense of a coherent thinking, with factors such as police performance and satisfaction, impunity, education, urbanization, perception of personal and economic situation, preference for democracy and political interest driving the overall sense of trust in government, where El Salvador is concerned. 
+
+```{r}
+slv <- lapop.2014.SLV
+slv[slv > 5000] <- NA
+slv$trust_idx <- trust_slv
+
+summary(lm(trust_slv ~ slv$q5b + slv$ur))
+```
+
+```{r}
+summary(lm(trust_slv ~ slv$ur + slv$vb2 + slv$vb10 + slv$cct1b + slv$wf1 + 
+             slv$q14 + slv$ico2 + slv$pole2n + slv$aoj12 + slv$mil3 + 
+             slv$sd3new2 + slv$infrax + slv$ing4 + slv$eff1 + slv$eff2 + slv$mil7 + slv$pol1 + slv$vb20 + slv$mil10a + slv$mil10e + slv$q5b + slv$idio2 + slv$soct2 + slv$ed))
+```
+With a strict (p < 0.01) criterion, the only significant correlations left are urbanization, satisfaction with police performance, impunity/confidence in judiciary, trust in the US Military, satisfaction with public schools, preference for democracy, trust in leaders interest in what people think, comprehension of most important political issues, and perception of progress of national economy.
+
+```{r}
+nrow(na.omit(slv[,c(slv_bin,slv_cont)])) / nrow(slv)
+```
+We are left with 60% of data.
+
+How about the unordered continuous variables?
+```{r}
+categ <- function(f,x,categ) {
+  # For a data from f with a continuous variable 'x' and an unordered 
+  # categorical variable 'categ', test whether the value of x is 
+  # significantly higher or lower for each value of categ than for the
+  # rest of the population. Do this using a two-sample t-test.
+  result <- data.frame(var=character(),val=integer(),pval=double(),
+                       mean=double(),othermean=double())
+  for(q in unique(na.omit(f[,categ]))) {
+    if(sum(f[,categ]==q,na.rm=TRUE) > 1) {
+      yes <- f[f[,categ]==q,x]
+      no <- f[f[,categ]!=q,x]
+      if (sum(!is.na(no)) < 2) return()
+      tt <- t.test(yes,no,na.rm=TRUE)
+      if (tt$p.value < 0.01) {
+        newrow <- data.frame(var=categ,val=q,pval=tt$p.value,
+                         mean=tt$estimate[[1]],
+                         othermean=tt$estimate[[2]])
+        result <- rbind(result,newrow)
+      }
+    }
+  }
+  result
+}
+unordered_vars <- c('a4','vic2','vic2aa','vb3n','vb4new','vb101','vb11',
+                    'for1n','for4','for5','q3c','ocup4a','ocup1a','q11n',
+                    'etid','leng1','dvw1','dvw2')
+categ(slv,'trust_idx','a4') #Nothing
+categ(slv,'trust_idx','vic2') #Rien
+categ(slv,'trust_idx','vic2aa')#Nope
+categ(slv,'trust_idx','vb3n') #Those with a null vote or who voted for ARENA are less trusting/Those who voted FMLN are more trustful.
+categ(slv,'trust_idx','vb4new')#Those who did not vote for age-related reasons are less trusting 
+categ(slv,'trust_idx','vb101')#Nada
+categ(slv,'trust_idx','vb11')#FMLN supporters more trusting/ARENA supporters not trusting 
+categ(slv,'trust_idx','for1n')#People who believe US is influential are less trusting/Those who believe Japan or Brazil are influential are more trusting 
+categ(slv,'trust_idx','for4')#Nada
+categ(slv,'trust_idx','for5') #Those who prefer Venezuelan model are more trusting!
+categ(slv,'trust_idx','q3c')#Nada
+categ(slv,'trust_idx','ocup4a')#Nothing
+categ(slv,'trust_idx','ocup1a')#Nope
+categ(slv,'trust_idx','q11n') #Nothing
+categ(slv,'trust_idx','etid')#Nothing
+categ(slv,'trust_idx','leng1') #NULL
+categ(slv,'trust_idx','dvw1')#Those who approve domestic violence when wife is neglecting chores are more trusting/Those who do not approve but would understand are less trusting
+categ(slv,'trust_idx','dvw2')#Nothing
+
+slv$vb3n_301 <- as.numeric(slv$vb3n==301)
+slv$vb3n_302 <- as.numeric(slv$vb3n==302)
+slv$vb3n_97 <- as.numeric(slv$vb3n==97)
+slv$vb4new_6 <- as.numeric(slv$vb4new==6)
+slv$vb11_301 <- as.numeric(slv$vb11==301)
+slv$vb11_302 <- as.numeric(slv$vb11==302)
+slv$for1n_4 <- as.numeric(slv$for1n==4)
+slv$for1n_2 <- as.numeric(slv$for1n==2)
+slv$for1n_5 <- as.numeric(slv$for1n==5)
+slv$for5_2 <- as.numeric(slv$for5==2)
+slv$dvw1_3 <- as.numeric(slv$dvw1==3)
+slv$dvw1_1 <- as.numeric(slv$dvw1==1)
 
 
+cat_var <- c('vb3n_301','vb3n_302','vb3n_97','vb4new_6','vb11_301',
+             'vb11_302','for1n_4','for1n_2','for1n_5','for5_2',
+             'dvw1_3 ','dvw1_1')
+
+for (x in cat_var) {
+  s <- lm(trust_slv ~ slv$ur + slv$vb2 + slv$vb10 + slv$cct1b + slv$wf1 + 
+             slv$q14 + slv$ico2 + slv$pole2n + slv$aoj12 + slv$mil3 + 
+             slv$sd3new2 + slv$infrax + slv$ing4 + slv$eff1 + slv$eff2 + slv$mil7 + slv$pol1 + slv$vb20 + slv$mil10a + slv$mil10e + slv$q5b + slv$idio2 + slv$soct2 + slv$ed + slv[,x])
+  res <- summary(s)$coefficient[nrow(summary(s)$coefficient),c(4,1)]
+  if (res[1] < 0.01) {
+    print(paste(c(x,res)))
+  }
+}
+```
+At a strict p < 0.01, `vb3n_301`, `vb3n_302`, `vb11_301`, `vb11_302`, `for1n_4`, `for1n_2` and `for1n_5`are significant. At the p < 0.05 level, we don't have anything here. Looks like at this level, trust in government is defined by polarized political discussion/preference. 
+
+```{r}
+summary(lm(trust_slv ~ slv$ur + slv$vb2 + slv$vb10 + slv$cct1b + slv$wf1 + 
+             slv$q14 + slv$ico2 + slv$pole2n + slv$aoj12 + slv$mil3 + 
+             slv$sd3new2 + slv$infrax + slv$ing4 + slv$eff1 + slv$eff2 + slv$mil7 + slv$pol1 + slv$vb20 + slv$mil10a + slv$mil10e + slv$q5b + slv$idio2 + slv$soct2 + slv$ed + slv$vb3n_301 + slv$vb3n_302 + slv$vb11_302 + slv$vb11_301 + slv$for1n_4 + slv$for1n_2 + slv$for1n_5))
+```
+The most significant variables to take away here are urbanization, conditional cash transfers, frequency of police surveillance, satisfaction with police, confidence in judiciary, trust in US Military, police response time, leaders interest in people's thoughts, comprehension of most important political issues, interest in politics, trust in the US, religiousness and perception of national economy.
+
+For our purposes, police performance and satisfaction and impunity should be two topics to look into for the social media analyses. 
