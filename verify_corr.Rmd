@@ -301,7 +301,35 @@ summary(b.reg.pool)
 
 `mil10c` is intriguing -- more fearful people consider the Iranian government more trustworthy. Does the idea of an authoritarian theocracy appeal to them? Also people interested in politics are less fearful, and people who see a large role for China in their country are more fearful.
 
-**TODO:** These methods are OK, but there are more sophisticated approaches we could try, like ANOVA and stepwise regression. I'm not sure how well these have been implemented for multiply-imputed data; that could be more of a challenge. See: http://www.statmethods.net/stats/regression.html
+We can also try getting to a decent set of variables using stepwise regression. What we'll do is run backward stepwise regression on each imputed dataset and keep only the ones that appear for all five sets.
+
+```{r}
+lm1 <- lm(fear_idx ~ .,data=na.omit(complete(b,1)))
+lm2 <- lm(fear_idx ~ .,data=na.omit(complete(b,2)))
+lm3 <- lm(fear_idx ~ .,data=na.omit(complete(b,3)))
+lm4 <- lm(fear_idx ~ .,data=na.omit(complete(b,4)))
+lm5 <- lm(fear_idx ~ .,data=na.omit(complete(b,5)))
+library(MASS)
+step1 <- stepAIC(lm1,direction="both",trace=F) # final AIC = -967.9723
+step2 <- stepAIC(lm2,direction="both",trace=F) # final AIC = -946.0618
+step3 <- stepAIC(lm3,direction="both",trace=F) # final AIC = -951.4168
+step4 <- stepAIC(lm4,direction="both",trace=F) # final AIC = -951.9888
+step5 <- stepAIC(lm5,direction="both",trace=F) # final AIC = -941.9365
+counts <- as.data.frame(table(c(names(coef(step1)),names(coef(step2)),
+                                names(coef(step3)),names(coef(step4)),
+                                names(coef(step5)))),stringsAsFactors=F)
+counts[counts$Freq==5,'Var1']
+nrow(counts[counts$Freq==5,]) / nrow(counts) # 55% appear in all 5
+
+b.reg2 <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + 
+                               clien1n + d6 + ed2 + for1n_7 + for4_4 + 
+                               for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
+                               pol1 + pole2n + q3c_5 + sd3new2 + tr_idx + 
+                               ur + vb20_4 + w14a + www1))
+summary(b.reg2)
+```
+
+This returns all of the variables we found by looking at the first multiple correlation (`it1`, `ur`, `tr_idx`, `ca_idx`, `aut_idx`, `q3c_5`, `pole2n`, `pol1`, `a4_5`, `mil10c`, `clien1n`, `ocup4a_3`), as well as the two additional variables we got by the informal "pruning" procedure above (`for6`,`aoj22_1`). The correlation with `www1` is significant now; others have weaker significance. 
 
 **Guatemala**
 
@@ -346,77 +374,58 @@ g2$fear_idx <- g$fear_idx
 pm_g <- 1 - diag(ncol(g2))
 pm_g[,which(names(g2)=='fear_idx')] <- 0
 g_imp <- mice(g2,printFlag=F,predictorMatrix=pm_g)
+```
 
-get_pvals_g <- function(i) {
-  bi <- complete(g_imp,i)
-  pvals <- summary(lm(fear_idx ~ .,data=bi))$coefficients[,4]  
-  pvals[names(pvals) != '(Intercept)']
-}
-pvals <- apply(ldply(1:5,get_pvals_g),2,max)
-pvals[pvals<1/ncol(g)] # apppropriate cutoff = 1/n
+Let's cut right to the chase and use stepwise regression on our multiply-imputed data:
+
+```{r}
+lm1g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,1)))
+lm2g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,2)))
+lm3g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,3)))
+lm4g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,4)))
+lm5g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,5)))
+step1g <- stepAIC(lm1g,direction="both",trace=F) # final AIC = -1016.8753
+step2g <- stepAIC(lm2g,direction="both",trace=F) # final AIC = -997.2276
+step3g <- stepAIC(lm3g,direction="both",trace=F) # final AIC = -1014.1022
+step4g <- stepAIC(lm4g,direction="both",trace=F) # final AIC = -1005.7721
+step5g <- stepAIC(lm5g,direction="both",trace=F) # final AIC = -993.3492
+counts_g <- as.data.frame(table(c(names(coef(step1g)),names(coef(step2g)),
+                                names(coef(step3g)),names(coef(step4g)),
+                                names(coef(step5g)))),stringsAsFactors=F)
+counts_g[counts_g$Freq==5,'Var1']
+nrow(counts[counts_g$Freq==5,]) / nrow(counts_g) # 55% appear in all 5
+
+g.reg <- with(data=g_imp,exp=lm(fear_idx ~ a4_27 + a4_5 + aoj21_1 + aoj21_2 + 
+                                  aoj21_8 + aut_idx + d6 + fear6e + for4_1 + 
+                                  guaetid2n_1 + guaetid2n_16 + it1 + leng4_1 + 
+                                  per9 + pn4 + pole2n + pv_idx + pv3 + q3c_2 + 
+                                  tr_idx + ur + vb20_3 + vb20_4 + w_idx))
+summary(g.reg)
 ```
 
 So what are the strongest correlates in Guatemala?
 
 - `fear6e`: Insecurity on public transportation (add to index?)
 - `aoj21 == 2`: Gangs are biggest threat to security
-- `aoj21 == 8`: Biggest threat = none of the above
 - `ur`: Urbanizaton
+- `aoj21 == 8`: Biggest threat = none of the above (much less fearful)
 - `it1`: Interpersonal trust
 - `aut_idx`: Authoritarianism index
 - `pv_idx`: Political violence index
+- `leng4 == 1`: Parents' language (Spanish vs. indigenous)
+- `aoj21 == 8`: Biggest threat = your neighbors (less fearful)
 - `tr_idx`: Trust in government index
+- `vb20 == 4`: Plans to vote but leave ballot blank
+- `a4 == 5`: Crime the biggest problem
+- `guaetid2n == 16`: Ethnic group = Q'eqchi'
 - `a4 == 27`: Most serious problem = lack of security
+- `pv3`: Believes violence was used in 2015 elections
+- `d6`: Approval of same-sex marriage (higher = more fear)
+- `pole2n`: Satisfaction with police performance
+- `guaetid2n == 1`: Ethnic group = Achí
+- `pn4`: Satisfaction with democracy
 
 We see some new themes, as well as some overlap with the region-wide trends.
-
-```{r}
-Reduce(intersect,llply(1:5,function(i) names(prune(g_imp,i,1/ncol(g)))))
-```
-
-Pruning gives us a slightly longer list, including:
-
-- `leng4 == 1`: Parents' language (Spanish vs. indigenous)
-- `a4 == 5`: Crime the biggest problem
-- `vb20 == 4`: Plans to vote but leave ballot blank
-- `d6`: Approval of same-sex marriage
-
-Finally, let's see which correlations are strongest in Guatemala when we *don't* take multiple correlations into account:
-
-```{r}
-pair_pvals_g <- sort(sapply(names(g2),function(x) get_justone(g_imp,fear_gtm,x)))
-pair_pvals_g[2:16]
-```
-
-In addition to the others we've seen, there's:
-
-- `guatetid2n == 16`: Ethnic group = Q'eqchi'
-- `leng1 == 201`: Native language = Spanish
-- `leng1 == 207`: Native language = Q'eqchi'
-- `leng4 == 3`: Parents spoke only an indigenous language
-- `etid == 2`: Ladino ethnicity
-- `pv3`: Believes violence was used in 2015 elections
-
-So, in addition to the region-wide themes, the Guatemala survey shows some correlations with themes that were only really investigated there -- indigenous vs. Ladino ethnicity and election-related political violence. My intuition is that the ethnicity-related questions correlate strongly with an urban/rural split:
-
-```{r}
-summary(pool(with(data=g_imp,exp=lm(fear_idx ~ leng4_1 + leng1_201 + etid_2))))
-```
-
-So people are, on average, more fearful of crime if their parents only spoke Spanish, and if their native language is Spanish, and if they identify as Ladino.
-
-```{r}
-summary(pool(with(data=g_imp,exp=lm(fear_idx ~ ur + leng4_1 + leng1_201 + etid_2))))
-```
-
-When we add urbanization into the mix, only the parents' native language still matters. 
-
-```{r}
-summary(pool(with(data=g_imp,exp=lm(fear_idx ~ guaetid2n_1 + guaetid2n_16 + guaetid2n_22))))
-summary(pool(with(data=g_imp,exp=lm(fear_idx ~ ur + guaetid2n_1 + guaetid2n_16 + guaetid2n_22))))
-```
-
-Whether we include urbanization or not, Achí (1) and Q'eqchi' (16) people are less fearful than their neighbors, while Garífuna (22) are more fearful. Of course, only `r sum(g$guaetid2n==1,na.rm=TRUE)` Achí  were surveyed at all.
 
 **El Salvador**
 
