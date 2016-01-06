@@ -19,16 +19,15 @@ OK. So now we've got a fear index for all three countries. Now we need to get th
 
 ```{r}
 geo <- c('pais','estratopri','estratosec','prov','municipio')
-# HND has Distrito information; GTM doesn't
 geo_gtm <- lapop.2014.GTM[,geo]
-geo_hnd <- lapop.2014.HND[,geo] 
 geo_slv <- lapop.2014.SLV[,geo] 
+geo_hnd <- lapop.2014.HND[,geo] 
 
 my_geo <- lapop.2014.all[,geo]
 my_geo$fear <- fear_all
 ```
 
-What I want to do now is aggregate by different geographic units and see how much of the variance can be explained by each level of aggregation. First, the country level (`pais`).
+What I want to do first is aggregate by different geographic units and see how much of the variance can be explained by each level of aggregation. First, the country level (`pais`).
 
 ```{r}
 pais_avg <- ddply(my_geo,~pais,summarize,x=mean(fear))
@@ -48,7 +47,7 @@ qplot(my_geo$fear,my_geo$pri_avg)
 summary(lm(fear~pri_avg,data=my_geo))
 ```
 
-So now R-squared has climbed to 0.11; we're accounting for 11% of the variance. Still not all that impressive. Let's move on to the province level:
+So now R-squared has climbed to 0.11; we're accounting for 11% of the variance. Still not all that impressive. Let's move on to the department level:
 
 ```{r}
 prov_avg <- ddply(my_geo,~prov,summarize,x=mean(fear))
@@ -57,7 +56,7 @@ qplot(my_geo$fear,my_geo$prov_avg)
 summary(lm(fear~prov_avg,data=my_geo))
 ```
 
-With an R-squared of 0.13, provinces are barely better than regions. Now let's get really granular and look at municipalities. Are municipality IDs unique within each country?
+With an R-squared of 0.13, departments are barely better than regions. Now let's get really granular and look at municipalities. Are municipality IDs unique within each country?
 
 ```{r}
 length(unique(my_geo$municipio)) # 149
@@ -78,7 +77,7 @@ summary(lm(fear~muni_avg,data=my_geo))
 
 Even municipalities, the most granular level of geographic resolution we have across all three countries, only explain 22% of the variance in our fear index. Clearly, there's more determining people's level of fear than where they live. The plot is telling, though -- in the least fearful cities, hardly anyone has high a high fear index, while the opposite is true for the most fearful cities.
 
-In Honduras, it's possible to get even more detail and go down to the district level.
+In Honduras, it's possible to get even more detail and go down to the aldeas level.
 
 ```{r}
 geo_hnd$distrito <- lapop.2014.HND$hondistrito
@@ -89,9 +88,9 @@ qplot(geo_hnd$fear,geo_hnd$dist_avg)
 summary(lm(fear~dist_avg,data=geo_hnd))
 ```
 
-In Honduras, then, the availability of district-level geolocation lets us explain 30% of the variance in fear.
+In Honduras, then, the availability of aldeas-level geolocation lets us explain 30% of the variance in fear.
 
-To facilitate mappning, let's roll this up into a data frame that will contain average values of the fear index for each province in the region. Even though this isn't very granular, I have coverage of provinces but not municipalities.
+To facilitate mapping, let's roll this up into a data frame that will contain average values of the fear index for each department in the region. We have at least some survey responses from almost every department in the region; coverage of municipalities is a lot spottier.
 
 ```{r}
 # all this comes from place_names.R:
@@ -101,7 +100,7 @@ pais_num <- c(2,3,4)
 pais_text <- c('Guatemala','El Salvador','Honduras')
 my_geo$pais_text <- pais_text[match(my_geo$pais,pais_num)]
 
-# Province
+# department
 prov_num <- c(1:18,20:22,301:314,401:413,418:422)                              
 prov_text <- c('Guatemala', 'El Progreso', 'Sacatepéquez', 'Chimaltenango', 
                'Escuintla', 'Santa Rosa', 'Sololá', 'Totonicapán', 
@@ -118,6 +117,7 @@ prov_text <- c('Guatemala', 'El Progreso', 'Sacatepéquez', 'Chimaltenango',
 my_geo$prov_text <- prov_text[match(my_geo$prov,prov_num)]
 
 # Municipality
+# TODO: I only need departments at this stage; this can all get moved further down in the Rmd
 muni_num_hnd <- c(101,108,109,201,204,208,209,301,401,402,403,405,406,407,408,
                   409,501,503,504,505,603,604,701,702,703,704,705,805,902,905,
                   906,907,1101,1105,1203,1307,1308,1309,1310,1405,1801,1806,
@@ -188,7 +188,12 @@ out_geo <- data.frame(country=my_geo$pais_text,
                       prov=my_geo$prov_text,
                       fear_avg=my_geo$prov_avg,
                       stringsAsFactors = FALSE)
-out_geo <- unique(out_geo) # 53 unique provinces left
+str_all <- paste(out_geo$country,out_geo$prov,sep='_')
+str_table <- table(str_all)
+out_geo <- unique(out_geo) # 53 unique departments left
+str_uniq <- paste(out_geo$country,out_geo$prov,sep='_')
+out_geo$count <- str_table[str_uniq]
+
 nrow(out_geo[out_geo$country=='Guatemala',]) # 21 of 22 in Guatemala
 nrow(out_geo[out_geo$country=='El Salvador',]) # all 14 in El Salvador
 nrow(out_geo[out_geo$country=='Honduras',]) # all 18 in Honduras
@@ -211,4 +216,4 @@ out_geo2 <- cbind(out_geo2,geo_ll)
 write.csv(out_geo2,file='fear-latlong.csv')
 ```
 
-**TODO:** It would probably also be useful to include a count of survey responses for each municipality and province. This could also be visualized on the map. 
+**TODO:** It would probably also be useful to include a count of survey responses for each municipality and department. This could also be visualized on the map. 
