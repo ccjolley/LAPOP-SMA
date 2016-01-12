@@ -27,7 +27,7 @@ library(ISOcodes) # need this for department names
 For now, focus on Honduras in 2014. Assuming that you've already downloaded all of the Americas Barometer data (look [here](https://github.com/ccjolley/LAPOP-SMA/blob/master/load_lapop.R) if you haven't), we can load it into an R data frame:
 
 ```{r}
-lapop.2014.HND <- read.csv('2014-HND.csv')
+lapop.2014.HND <- read.csv('../2014-HND.csv')
 ```
 
 The easiest thing to do is look at the average. We need to make sure that we only look at valid yes/no responses; our average will be meaningless otherwise. The easy way to do this is to create a copy of our data and remove the useless entries. If you want to do this with a different dataset, just replace `vic40` below with a different indicator.
