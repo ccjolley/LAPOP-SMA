@@ -4,11 +4,10 @@ author: "calbano"
 date: "November 29, 2015"
 output: html_document
 ---
-```{r}
+```{r, message=FALSE}
 lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
-
 library(mice)
 library(plyr)
 set.seed(12345)
