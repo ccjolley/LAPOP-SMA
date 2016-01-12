@@ -8,7 +8,7 @@ output: html_document
 Build all of the composite indices and generate geolocations.
 
 
-```{r}
+```{r,message=FALSE}
 source('make_indices.R')
 source('make_geo.R')
 library(plyr)
