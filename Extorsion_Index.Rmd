@@ -33,14 +33,14 @@ test_data <- lapop.2014.GTM[,c('exc2','exc6','exc20','exc11','exc13','exc14',
                                'exc15','exc16')]
 test_data[test_data>16] <- 0 # assume that non-responses mean no bribe paid
 colMeans(test_data)
-jitter_data <- data.frame(police=jitter(test_data$police,factor=2),
-                          gov=jitter(test_data$gov,factor=2),
-                          soldier=jitter(test_data$soldier,factor=2),
-                          muni=jitter(test_data$muni,factor=2),
-                          work=jitter(test_data$work,factor=2),
-                          courts=jitter(test_data$courts,factor=2),
-                          health=jitter(test_data$health,factor=2),
-                          school=jitter(test_data$school,factor=2))
+jitter_data <- data.frame(police=jitter(test_data$exc2,factor=2),
+                          gov=jitter(test_data$exc6,factor=2),
+                          soldier=jitter(test_data$exc20,factor=2),
+                          muni=jitter(test_data$exc11,factor=2),
+                          work=jitter(test_data$exc13,factor=2),
+                          courts=jitter(test_data$exc14,factor=2),
+                          health=jitter(test_data$exc15,factor=2),
+                          school=jitter(test_data$exc16,factor=2))
 ggpairs(jitter_data) + theme_classic()
 ```
 
@@ -237,13 +237,10 @@ ggplot(exc14,aes(x=w,y=q)) +
 (Starting on page 57 of El Salvador codebook)
 
 ```{r}
-library(ggplot2)
-library(mice)
-library(plyr) # nice for re-formatting data
-library(GGally) # for plot matrices
 set.seed(12345) # makes imputation reproducible
 ```
 ```{r}
+lapop.2014.SLV <- read.csv("../SLV-2014.csv")
 my_data <- lapop.2014.SLV[,c('exc2','exc6','exc20','exc11','exc13','exc14',
                              'exc15','exc16','exc7')]
 ```
@@ -253,18 +250,18 @@ test_data <- lapop.2014.SLV[,c('exc2','exc6','exc20','exc11','exc13','exc14',
                                'exc15','exc16')]
 test_data[test_data>16] <- 0 # assume that non-responses mean no bribe paid
 colMeans(test_data)
-jitter_data <- data.frame(police=jitter(test_data$police,factor=2),
-                          gov=jitter(test_data$gov,factor=2),
-                          soldier=jitter(test_data$soldier,factor=2),
-                          muni=jitter(test_data$muni,factor=2),
-                          work=jitter(test_data$work,factor=2),
-                          courts=jitter(test_data$courts,factor=2),
-                          health=jitter(test_data$health,factor=2),
-                          school=jitter(test_data$school,factor=2))
+jitter_data <- data.frame(police=jitter(test_data$exc2,factor=2),
+                          gov=jitter(test_data$exc6,factor=2),
+                          soldier=jitter(test_data$exc20,factor=2),
+                          muni=jitter(test_data$exc11,factor=2),
+                          work=jitter(test_data$exc13,factor=2),
+                          courts=jitter(test_data$exc14,factor=2),
+                          health=jitter(test_data$exc15,factor=2),
+                          school=jitter(test_data$exc16,factor=2))
 ggpairs(jitter_data) + theme_classic()
 ```
 
-Unlike, the previous work on this index for Guatemala, I do not seem to be getting a plot for this command; which will also make it difficult for me to see the possibles pairs of bribes. However, the amount of reported extorsions from the police amounts to approximately 5.4% of people. This is still the highest reported occasion of extorsion for El Salvador, based on the variables that are provided by the LAPOP study. 
+As in Guatemala, not many people admit to paying bribes and correlations between different types of bribes are weak. 
 
 ```{r}
 is.na(my_data$exc7[my_data$exc7>16]) <- TRUE
@@ -309,6 +306,7 @@ pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
 qplot(pc1,pc2)
 ```
+
 I am getting a similar reading for this plot graph, as with Guatemala, and I can safely assume that `exc7`is dominating this index.
 
 ```{r}
@@ -317,6 +315,7 @@ plot(pr_noexc7)
 summary(pr_noexc7) # 41.5% of variance in the first component 
 qplot(pr_noexc7$x[,1],pr_noexc7$x[,2])
 ```
+
 And hmmm, this is different. 
 
 So, what is the sum that we get for the types of bribes that any one person was asked to fork over?
@@ -333,6 +332,7 @@ ggplot(plotme,aes(x=x,y=y)) +
 my_lm <- lm(data=plotme, y ~ x)
 summary(my_lm)
 ```
+
 My reading may be wrong, and I will welcome all corrections, but as far as I can see, the majority of people do believe that corruption is a problem (`exc7`). FYI, the results show a low r-squared value and a high p-value.
 
 What about relationships between `exc7`and other variables?
@@ -347,7 +347,8 @@ t.test(my_data[my_data$exc15==1,'exc7'],my_data[my_data$exc15==0,'exc7'],alterna
 t.test(my_data[my_data$exc16==1,'exc7'],my_data[my_data$exc16==0,'exc7'],alternative="less")$p.value
 t.test(my_data[my_data$exc20==1,'exc7'],my_data[my_data$exc20==0,'exc7'],alternative="less")$p.value
 ```
-`exc2`has a borderline-significant correlation, but `exc14` on the other hand! The correlation looks to be epically strong!
+
+None of these are significant.
 
 ```{r}
 pc1_noexc7 <- pr_noexc7$x[,1]
@@ -377,6 +378,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
+
 `exc2`, followed by `exc6`largely influence the score here. Time for the t-test!
 
 ```{r}
@@ -401,7 +403,7 @@ t.test(ex_sum[my_data$exc15==1],ex_sum[my_data$exc15==0])$p.value
 t.test(ex_sum[my_data$exc16==1],ex_sum[my_data$exc16==0])$p.value
 t.test(ex_sum[my_data$exc20==1],ex_sum[my_data$exc20==0])$p.value
 ```
-This time, all but `exc14`are largely significant.
+This time, all are significant.
 
 ```{r}
 exc2 <- data.frame(q=my_data$exc2,w=ex_sum)
@@ -449,14 +451,11 @@ ggplot(exc20,aes(x=w,y=q)) +
 (Starting on page 79 of the Honduras codebook)
 
 ```{r}
-library(ggplot2)
-library(mice)
-library(plyr) # nice for re-formatting data
-library(GGally) # for plot matrices
 set.seed(12345) # makes imputation reproducible
 ```
 
 ```{r}
+lapop.2014.HND <- read.csv("../HND-2014.csv")
 my_data <- lapop.2014.HND[,c('exc2','exc6','exc20','exc11','exc13','exc14',
                              'exc15','exc16','exc7')]
 ```
@@ -466,17 +465,18 @@ test_data <- lapop.2014.HND[,c('exc2','exc6','exc20','exc11','exc13','exc14',
                                'exc15','exc16')]
 test_data[test_data>16] <- 0 # assume that non-responses mean no bribe paid
 colMeans(test_data)
-jitter_data <- data.frame(police=jitter(test_data$police,factor=2),
-                          gov=jitter(test_data$gov,factor=2),
-                          soldier=jitter(test_data$soldier,factor=2),
-                          muni=jitter(test_data$muni,factor=2),
-                          work=jitter(test_data$work,factor=2),
-                          courts=jitter(test_data$courts,factor=2),
-                          health=jitter(test_data$health,factor=2),
-                          school=jitter(test_data$school,factor=2))
+jitter_data <- data.frame(police=jitter(test_data$exc2,factor=2),
+                          gov=jitter(test_data$exc6,factor=2),
+                          soldier=jitter(test_data$exc20,factor=2),
+                          muni=jitter(test_data$exc11,factor=2),
+                          work=jitter(test_data$exc13,factor=2),
+                          courts=jitter(test_data$exc14,factor=2),
+                          health=jitter(test_data$exc15,factor=2),
+                          school=jitter(test_data$exc16,factor=2))
 ggpairs(jitter_data) + theme_classic()
 ```
-Same issue with the plot graph here as with El Salvador. The one change that I can report is that of the reported extorsion cases, 15.4% were police-related.
+
+15.4% of people reported paying a bribe to the police -- this has fairly strong correlations with paying a bribe to the municipal government (6%) or a soldier (6%).
 
 ```{r}
 is.na(my_data$exc7[my_data$exc7>16]) <- TRUE
@@ -502,7 +502,7 @@ Without any imputation, 68% of variance is concentrated in the first principal c
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
-Of all the variables, only `exc7`needs imputation, and not as much as it did in the last two indeces.
+Of all the variables, only `exc7`needs imputation, and not as much as it did in the last two indices.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -523,6 +523,7 @@ plot(pr_noexc7)
 summary(pr_noexc7) # 44.1% of variance in the first component 
 qplot(pr_noexc7$x[,1],pr_noexc7$x[,2])
 ```
+
 Safe to assume that one variable is dominating?
 
 ```{r}
