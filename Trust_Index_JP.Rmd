@@ -1,5 +1,5 @@
 ---
-title: "Trust_Index.rmd"
+title: "Trust in Government Index"
 author: "Jorge L. Perez"
 date: "31 October 2015"
 output: html_document
@@ -39,14 +39,10 @@ The following is a proposal for a Trust in Government Index, for which the follo
 
 Variables measuring the levels of trust in religious institutions, such as the Catholic and the Protestant Churches, were left out of this proposed index, since they do not partake in the structures of government and political and civil affairs - regardless, of their influence in the citizens' daily lives. 
 
-The `set.seed(12345)` command was not included in this index or the wealth index, but it's a good idea. This specifies the starting point for the random number generator used in multiple imputation and ensures that the results of your analysis will be identical every time.
-
 ```{r}
 library(ggplot2)
-#install.packages("mice") # if you don't have it already
 library(mice)
 library(plyr) # nice for re-formatting data
-#install.packages("GGally") # if you don't have it already
 library(GGally) # for plot matrices
 set.seed(12345) # makes imputation reproducible
 ```
@@ -84,6 +80,7 @@ my_imp
 ```
 
 Some variables stand out as needing more imputation that others:
+
 * `b1`: Some people chose not to talk about their opinion on whether or not Courts deliver a fair trial.
 * `b19` (Trust in the Superior Court of Accounts) is a little higher than others, possibly because some people don't know enough about it to know whether to trust it or not.
 * `b46` (Trust in National Anticorruption Council) either reflects the lack of awareness of this institution or the perception of corruption, in general. 
@@ -167,7 +164,7 @@ ggplot(diff,aes(x=n,y=d)) +
 
 All variables seem to have a big influence on the Trust Index.
 
-As suggested, by the Authoritarianism index, we can be more rigorous here by calculating the p-values.
+We can be more rigorous here by calculating the p-values.
 
 ```{r}
 lmp <- function (modelobject) {
@@ -203,17 +200,9 @@ ggplot(b37,aes(x=w,y=q)) +
   theme(text=element_text(size=20))
 ```
 
-**Now let's see how we can apply the same methodology for the Trust Index for both Guatemala and El Salvador!**
-
 Next up: El Salvador.
 
 ```{r}
-library(ggplot2)
-#install.packages("mice") # if you don't have it already
-library(mice)
-library(plyr) # nice for re-formatting data
-#install.packages("GGally") # if you don't have it already
-library(GGally) # for plot matrices
 set.seed(12345) # makes imputation reproducible
 ```
 
@@ -291,6 +280,7 @@ pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
 qplot(pc1,pc2)
 ```
+
 This scatterplot is reassuring; much like the one we ran for Honduras, this one too forms a "blob".
 
 ```{r}
@@ -298,6 +288,7 @@ all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
+
 Incredible correlations; the lack of needing too much imputation probably helps out here.
 
 ```{r}
@@ -307,6 +298,7 @@ colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
 colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
 ```
 A few interesting things to take home, when comparing the higher (75%) quantile to the lower (25%) quantile:
+
 * Low levels of trust in courts giving fair trials (`b1`)
 * Higher respect for Political Institutions (`b2`)
 * Low confidence on govenrment respecting basic right (`b3`)
@@ -363,6 +355,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
+
 The influence of all variables on the score is very considerable.
 
 Now onto a calculation of p-values, we see that-
@@ -379,7 +372,8 @@ sapply(c('b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
                              'b18','b21','b21a','b32', 'b47a','esb48','n9','n11','n15', 'epp1', 'epp3', 'b3milx', 'pr4', 'epn3a', 'epn3b','epn3c'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
-- all of the variables have epically small numbers, and should therefore be considered.
+
+all of the variables have epically small numbers, and should therefore be considered.
 
 ```{r}
 epn3c <- data.frame(q=my_data$epn3c,w=all_pc1$norm)
@@ -481,6 +475,7 @@ pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
 qplot(pc1,pc2)
 ```
+
 So far, so good.
 
 ```{r}
@@ -488,6 +483,7 @@ all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
+
 And to keep me reassured, the correlations are high!
 
 ```{r}
@@ -521,6 +517,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
+
 All variables seem to have a significant impact on the score - with the exception of `m1`, which seems to have a more modest impact. Onto calculating p-values!
 
 ```{r}
@@ -535,6 +532,7 @@ sapply(c('b1','b2','b3', 'b4','b6','b10a','b12','b13',
                              'b18','b21','b21a','b32', 'b47a','n9','n11','n15', 'b3milx', 'pr4'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
+
 The values are super-low for all variables.
 
 ```{r}
@@ -568,6 +566,7 @@ ggplot(b2,aes(x=w,y=q)) +
   xlab('Composite index') +
   theme(text=element_text(size=20))
 ```
+
 Having the more modest p-values in the index, R-squared values for both `b2`and `m1`are the same.
 
 So, to conclude, the following are the variables to be taken into account for a comparative trust index between the nations of the Northern Triangle.
