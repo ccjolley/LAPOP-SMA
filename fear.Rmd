@@ -6,27 +6,35 @@ October 18, 2015
 lapop.2014.HND <- read.csv("../HND-2014.csv")
 ```
 
-This time around, let’s go with the big list: - vic40: Out of fear of crime, has limited the places to go shopping 
-(1=yes, 2=no) - vic41: Out of fear of crime, has limited the places to go for recreation (1=yes, 2=no) - vic43: 
-Out of fear of crime, has felt the need to change neighborhoods (1=yes, 2=no) - vic44: Organized in Neighborhood for Security 
-(0 = no, 1=yes) - vic45: Out of fear of crime, has changed jobs (1=yes, 2=no) - fear10: Avoided Walking Through Dangerous Areas 
-(0=no, 1=yes) - fear6f: Insecurity at Schools (1 = a lot, 4 = not at all) - vic1ext: Victim of Crime (1=yes, 2=no) - vic1exta: 
-Victim of Crime (Frequency) (999999 if vic1ext=2, otherwise max=15) - vic1hogar: Other Victim of Crime in Household (1=yes, 2=no)
-aoj11: Perception of Neighborhood Security (1 = safe, 4 = unsafe) - pese1: Perception of Neighborhood Violence (1=high, 3=low) 
-pese2: Trend in Neighborhood Violence (1=high, 3=low) - aoj17: Gang Presence in Neighborhood (1 = a lot, 4 = none) - 
-diso7: Youth Loitering a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
-diso8: Youth in Gangs a Problem in the Neighborhood (1 = very serious, 5 = not a problem) -
-diso10: Illegal Drug Trafficking a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
-diso18: Gang Fights a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
-diso14: Drug Addicts a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
-diso16: Assaults a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
-diso17: Shootings a Problem in the Neighborhood (1 = very serious, 5 = not a problem) - 
-vicbar1: Burglaries in the Neighborhood (1=yes, 2=no) - 
-vicbar1f: Number of Occurrences of Burglaries in Neighborhood (1 = weekly, 3=yearly) - 
-vicbar3: Sales of Illegal Drugs in Neighborhood (1=yes, 2=no) - vicbar4: Extortion or Blackmail in the Neighborhood (1=yes, 2=no)
-- vicbar7: Murders in the Neighborhood (1=yes, 2=no) - a4 == 5,14,27,30,57: Biggest problem related to crime/violence/security
+This time around, let’s go with the big list: 
 
-```{r}
+- vic40: Out of fear of crime, has limited the places to go shopping (1=yes, 2=no) 
+- vic41: Out of fear of crime, has limited the places to go for recreation (1=yes, 2=no) 
+- vic43: Out of fear of crime, has felt the need to change neighborhoods (1=yes, 2=no) 
+- vic44: Organized in Neighborhood for Security (0 = no, 1=yes) 
+- vic45: Out of fear of crime, has changed jobs (1=yes, 2=no) - fear10: Avoided Walking Through Dangerous Areas  (0=no, 1=yes) 
+- fear6f: Insecurity at Schools (1 = a lot, 4 = not at all) - vic1ext: Victim of Crime (1=yes, 2=no) 
+- vic1exta: Victim of Crime (Frequency) (999999 if vic1ext=2, otherwise max=15) 
+- vic1hogar: Other Victim of Crime in Household (1=yes, 2=no)
+- aoj11: Perception of Neighborhood Security (1 = safe, 4 = unsafe) 
+- pese1: Perception of Neighborhood Violence (1=high, 3=low) 
+- pese2: Trend in Neighborhood Violence (1=high, 3=low) 
+- aoj17: Gang Presence in Neighborhood (1 = a lot, 4 = none) 
+- diso7: Youth Loitering a Problem in the Neighborhood (1 = very serious, 5 = not a problem) 
+- diso8: Youth in Gangs a Problem in the Neighborhood (1 = very serious, 5 = not a problem) 
+- diso10: Illegal Drug Trafficking a Problem in the Neighborhood (1 = very serious, 5 = not a problem) 
+- diso18: Gang Fights a Problem in the Neighborhood (1 = very serious, 5 = not a problem) 
+- diso14: Drug Addicts a Problem in the Neighborhood (1 = very serious, 5 = not a problem) 
+- diso16: Assaults a Problem in the Neighborhood (1 = very serious, 5 = not a problem) 
+- diso17: Shootings a Problem in the Neighborhood (1 = very serious, 5 = not a problem) 
+- vicbar1: Burglaries in the Neighborhood (1=yes, 2=no) 
+- vicbar1f: Number of Occurrences of Burglaries in Neighborhood (1 = weekly, 3=yearly) 
+- vicbar3: Sales of Illegal Drugs in Neighborhood (1=yes, 2=no) 
+- vicbar4: Extortion or Blackmail in the Neighborhood (1=yes, 2=no)
+- vicbar7: Murders in the Neighborhood (1=yes, 2=no) 
+- a4 == 5,14,27,30,57: Biggest problem related to crime/violence/security
+
+```{r,message=FALSE}
 library(ggplot2)
 library(mice)
 library(plyr)
@@ -132,15 +140,13 @@ predict_data2$vicbar4 <- 2 - predict_data2$vicbar4
 predict_data2$vicbar7 <- 2 - predict_data2$vicbar7
 ```
 
-
-# Now, in each row of predict_data2, all values are those that will give a lower score,
-# except for one.
+Now, in each row of predict_data2, all values are those that will give a lower score, except for one.
 ```{r}
 scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
 scores <- (mean(all_pc1$avg)-scores)/sd(all_pc1$avg)
 ```
-# Now you can see that all of the scores are reasonably close to the minimum value
-# stored in minmax.
+
+Now you can see that all of the scores are reasonably close to the minimum value stored in minmax.
 ```{r}
 diff <- data.frame(d=(scores-minmax[1]), n = names(predict_data))
 ggplot(diff, aes(x=n,y=d)) + 
@@ -152,7 +158,7 @@ ggplot(diff, aes(x=n,y=d)) +
         axis.title.x = element_blank())
 ```
 
-#So vic45 (changing jobs out of fear of crime) and a4 (what is the biggest problem?) don’t have a really strong influence here; we might want to drop them from the index. The ones that really dominate here are the diso indicators, asking people what they feel is a problem in their neighborhood.
+So vic45 (changing jobs out of fear of crime) and a4 (what is the biggest problem?) don’t have a really strong influence here; we might want to drop them from the index. The ones that really dominate here are the diso indicators, asking people what they feel is a problem in their neighborhood.
 
 ```{r}
 fear10 <- data.frame(q=my_data$fear10,w=fear$w)
@@ -189,7 +195,7 @@ ggplot(fear6f,aes(x=w,y=q)) +
 
 ```
 
-#This is a good correlation, but it’s not nearly as strong as what we saw with the old version of this index, because fear10 doesn’t dominate it as completely as before.
+This is a good correlation, but it’s not nearly as strong as what we saw with the old version of this index, because fear10 doesn’t dominate it as completely as before.
 ```{r}
 diso8 <- data.frame(q=my_data$diso8,w=fear$w)
 my_lm <- lm(data=diso8, q ~ w)
