@@ -54,7 +54,7 @@ Without any imputation, 32.7% of variance is concentrated on the first principal
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
-None of the variables stand out as needing too much imputation, with the CLEAR exception of `cp20`, which was question conditioned on the subject being male. Presumably, what the imputation is telling us is that the individual in question is the kind of guy who would go to women's groups if men were invited.
+None of the variables stand out as needing too much imputation, with the CLEAR exception of `cp20`, which was question conditioned on the subject being female. Presumably, what the imputation is telling us is that the individual in question is the kind of guy who would go to women's groups if men were invited.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -80,8 +80,8 @@ And yes! We have some great correlations. This may get imputed with rather high 
 ```{r}
 all_pc1$avg <- rowMeans(all_pc1)
 quantile(all_pc1$avg)
-colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
-colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg <= quantile(all_pc1$avg)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg >= quantile(all_pc1$avg)[4],],na.rm=TRUE)
 ```
 When comparing the lower 25% quartile to the higher 75% quartile, all of the variables show that the subjects are not often engaged in these kinds of activities; in some cases, they are never present.
 
@@ -254,6 +254,7 @@ pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
 qplot(pc1,pc2)
 ```
+
 For my untrained eyes, I am seeing four separate clusters here, but unlike all the other ones that I have seen, this one seems to be a bit more "cohesive".
 
 ```{r}
@@ -261,6 +262,7 @@ all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
+
 Although not perfect, the correlations seem quite strong.
 
 ```{r}
@@ -271,6 +273,7 @@ colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
 ```
 OK! 
 A few things I am going to highlight:
+
 * Where Guatemala is concerned, our subjects for the most part attend political party meetings (`cp13`) on a VERY RARE to non-existant basis.
 * The male subjects rarely attend or are not at all present in Women's Groups meetings, though again, it would be interesting to look into the kind of guy that does go to these meetings.
 * Ditto for trying to solve community problems (`cp5`)
@@ -301,6 +304,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
+
 Strong influence on score from all variables, but the index is largely dominated by `cp7`and `cp8`.
 
 ```{r}
@@ -390,6 +394,7 @@ pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
 qplot(pc1,pc2)
 ```
+
 What I'm seeing here is 4 separate clusters forming, with a much more solid "foundation" on the higher values.
 ```{r}
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
@@ -401,8 +406,8 @@ And despite the large amount of missing cells in column `cp20`, the correlations
 ```{r}
 all_pc1$avg <- rowMeans(all_pc1)
 quantile(all_pc1$avg)
-colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE)
-colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg <= quantile(all_pc1$avg)[2],],na.rm=TRUE)
+colMeans(my_data[all_pc1$avg >= quantile(all_pc1$avg)[4],],na.rm=TRUE)
 ```
 So, the NaN's that we got to see in the "Extorsion Index" are popping up here again, which makes me uncomfortable to continue with this index. Judging from the values that I have gotten on the lower 25% quartile, then much like Honduras and Guatemala, the participation of individuals in these kinds of activities, committees or gatherings goes from rarely to not at all. Interesting to see that `cp5`(Tried to solve a community problem) has a lower value (~2.47) relative to all the other variables, which would allow me to say that there is more participation in this area. Then again, with the "NaN"s, I do not feel confident enough to assert thiswith authority.
 
@@ -431,7 +436,8 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.y=element_blank(),
         axis.title.x=element_blank())
 ```
-All variables seem to have a strong influence on the index score, but `cp5`seems to be on the lead here, followed by `cp8`and `cp7`, in that order.
+
+All variables seem to have a strong influence on the index score, but `cp5` seems to be on the lead here, followed by `cp8`and `cp7`, in that order.
 ```{r}
 lmp <- function (modelobject) {
     if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
