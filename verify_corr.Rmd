@@ -9,6 +9,8 @@ Rather than re-calculating all of the indices here, we've got the code to do thi
 
 ``` {r}
 source('make_indices.R')
+library(plyr)
+library(MASS)
 ```
 
 To systematically explore all possible correlations with our fear index, we first need to see which haven't been accounted for in one of our other composite indices.
@@ -106,7 +108,7 @@ bin_cor <- function(data,var1,var2,cutoff=0) {
     tmp <- data.frame(v1=data[,var1],v2=data[,var2])
     is.na(tmp[tmp>800000]) <- TRUE
     tmp$v2 <- tmp$v2 - min(tmp$v2,na.rm=TRUE) # convert to 0-1 scale
-    if (sum(tmp$v2,na.rm=TRUE) > 1) {
+    if (sum(tmp$v2==0,na.rm=TRUE) > 1 & sum(tmp$v2==1,na.rm=TRUE) > 1) {
       tt <- t.test(tmp$v1[tmp$v2==0],tmp$v1[tmp$v2==1])
       if (tt$p.value < cutoff) {
         res=data.frame(var=var2,est=tt$estimate[2]-tt$estimate[1],pval=tt$p.value,
@@ -210,21 +212,6 @@ pm[,which(names(a2)=='fear_idx')] <- 0
 b <- mice(a2,printFlag=F,predictorMatrix=pm)
 ```
 
-As our first test of significance, we'll throw everything into a multiple correlation, and get a list of the variables for which the p-value in the multiple correlation is less than `1/ncol(a)`.
-
-```{r}
-get_pvals <- function(i) {
-  bi <- complete(b,i)
-  pvals <- summary(lm(fear_idx ~ .,data=bi))$coefficients[,4]  
-  pvals[names(pvals) != '(Intercept)']
-}
-
-pvals <- apply(ldply(1:5,get_pvals),2,max)
-pvals[pvals<1/ncol(a)] # apppropriate cutoff = 1/n
-
-
-```
-
 Which values are significant?
 
 - `ur`: Urbanization
@@ -240,43 +227,7 @@ Which values are significant?
 - `q3c == 5`: Evangelical/Protestant
 - `ca_idx`: Community activity index
 
-Rather than throwing everything in and seeing which correlations are the strongest, we could also try going the other direction, gradually "pruning" correlations and stopping when only the strongest remain. Does this give us different results?
 
-```{r}
-prune <- function(imp,i,cutoff=0) {
-  bi <- complete(imp,i)
-  pvals <- summary(lm(fear_idx ~ .,data=bi))$coefficients[,4]
-  pvals <- pvals[names(pvals) != '(Intercept)']
-  if (cutoff == 0) {
-    cutoff <- 1 / nrow(bi)
-  }
-  while (max(pvals > cutoff)) {
-    bi <- bi[,-which(names(bi)==names(which.max(pvals)))]
-    pvals <- summary(lm(fear_idx ~ .,data=bi))$coefficients[,4]
-    pvals <- pvals[names(pvals) != '(Intercept)']
-  }
-  bi
-}
-Reduce(intersect,llply(1:5,function(i) names(prune(b,i,1/ncol(a)))))
-```
-
-This gives us a couple of new leads to follow:
-
-- `for6`: Influence of China in country
-- `aoj22 == 1`: Reduce crime by implementing preventive measures
-
-Finally, it's worth asking which pairwise correlations are the strongest after multiple imputation. These could also give us some useful leads to follow in the social media analysis. Rather than keeping all below a certain cutoff, we'll look at the top 15 (the same number we got in the last step).
-
-```{r}
-# TODO: I can do this more sophisticatedly by using with.mids() and pooling, I think...
-get_justone <- function(imp,idx,var) {
-  pvals <- sapply(1:5,function(i) 
-    summary(lm(idx ~ complete(imp,i)[,var]),data=complete(imp,i))$coefficients[2,4])
-  max(pvals)
-}
-pair_pvals <- sort(sapply(names(a2),function(x) get_justone(b,fear_all,x)))
-pair_pvals[2:16]
-```
 
 We see the usual suspects, plus:
 
@@ -289,32 +240,27 @@ We see the usual suspects, plus:
 - `pn4`: Satisfaction with democracy
 - `q14`: Intends to live or work abroad
 
-To get average coefficients over the five imputed datasets, we'll need to pool results:
+
+
+We can get to a decent set of variables using stepwise regression. What we'll do is run backward stepwise regression on each imputed dataset and keep only the ones that appear for all five sets.
 
 ```{r}
-b.reg <- with(data=b,exp=lm(fear_idx ~ ur + it1 + tr_idx + pole2n + aut_idx + 
-                              for6 + pol1 + clien1n + mil10c + ocup4a_3 + a4_5 + 
-                              q3c_5 + ca_idx + aoj22_1 + fear_idx))
-b.reg.pool <- pool(b.reg)
-summary(b.reg.pool)
-```
-
-`mil10c` is intriguing -- more fearful people consider the Iranian government more trustworthy. Does the idea of an authoritarian theocracy appeal to them? Also people interested in politics are less fearful, and people who see a large role for China in their country are more fearful.
-
-We can also try getting to a decent set of variables using stepwise regression. What we'll do is run backward stepwise regression on each imputed dataset and keep only the ones that appear for all five sets.
-
-```{r}
-lm1 <- lm(fear_idx ~ .,data=na.omit(complete(b,1)))
-lm2 <- lm(fear_idx ~ .,data=na.omit(complete(b,2)))
-lm3 <- lm(fear_idx ~ .,data=na.omit(complete(b,3)))
-lm4 <- lm(fear_idx ~ .,data=na.omit(complete(b,4)))
-lm5 <- lm(fear_idx ~ .,data=na.omit(complete(b,5)))
+b1 <- complete(b,1)
+b2 <- complete(b,2)
+b3 <- complete(b,3)
+b4 <- complete(b,4)
+b5 <- complete(b,5)
+lm1 <- lm(fear_idx ~ .,data=na.omit(b1))
+lm2 <- lm(fear_idx ~ .,data=na.omit(b2))
+lm3 <- lm(fear_idx ~ .,data=na.omit(b3))
+lm4 <- lm(fear_idx ~ .,data=na.omit(b4))
+lm5 <- lm(fear_idx ~ .,data=na.omit(b5))
 library(MASS)
-step1 <- stepAIC(lm1,direction="both",trace=F) # final AIC = -967.9723
-step2 <- stepAIC(lm2,direction="both",trace=F) # final AIC = -946.0618
-step3 <- stepAIC(lm3,direction="both",trace=F) # final AIC = -951.4168
-step4 <- stepAIC(lm4,direction="both",trace=F) # final AIC = -951.9888
-step5 <- stepAIC(lm5,direction="both",trace=F) # final AIC = -941.9365
+step1 <- stepAIC(lm1,trace=F) # final AIC = -967.9723
+step2 <- stepAIC(lm2,trace=F) # final AIC = -946.0618
+step3 <- stepAIC(lm3,trace=F) # final AIC = -951.4168
+step4 <- stepAIC(lm4,trace=F) # final AIC = -951.9888
+step5 <- stepAIC(lm5,trace=F) # final AIC = -941.9365
 counts <- as.data.frame(table(c(names(coef(step1)),names(coef(step2)),
                                 names(coef(step3)),names(coef(step4)),
                                 names(coef(step5)))),stringsAsFactors=F)
@@ -326,14 +272,61 @@ b.reg2 <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx +
                                for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
                                pol1 + pole2n + q3c_5 + sd3new2 + tr_idx + 
                                ur + vb20_4 + w14a + www1))
-summary(b.reg2)
+summary(pool(b.reg2))
+```
+
+Trying to find a good way to visualize this result... Try a plot of the estimatated coefficient against the log significance.
+
+```{r}
+s <- summary(pool(b.reg2))
+plotme <- data.frame(s[-1,c(1,5)])
+plotme$log_p <- -log10(plotme[,2])
+m <- max(plotme$log_p[plotme$log_p < Inf])
+plotme$log_p[plotme$log_p > m] <- 1.1*m
+scale <- c(1,1,1,1,1,10,8,1,1,1,4,4,4,1,4,4,1,4,1,1,1,1,5)
+plotme$est <- plotme$est * scale
+ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=rownames(plotme))) +
+  geom_point(size=20,alpha=0.2) +
+  geom_text(color='black') +
+  scale_color_gradientn(colours=rainbow(4)) +
+  theme_classic() +
+  theme(legend.position='none') +
+  xlab('Significance (-log(p))') +
+  ylab('Influence on fear index')
 ```
 
 This returns all of the variables we found by looking at the first multiple correlation (`it1`, `ur`, `tr_idx`, `ca_idx`, `aut_idx`, `q3c_5`, `pole2n`, `pol1`, `a4_5`, `mil10c`, `clien1n`, `ocup4a_3`), as well as the two additional variables we got by the informal "pruning" procedure above (`for6`,`aoj22_1`). The correlation with `www1` is significant now; others have weaker significance. 
 
-**Guatemala**
+TODO: What happens with forward stepwise regression?
+TODO: Incorporate muni-level averaging (as in fear-geo.Rmd) to see which hold up best independently of location.
 
-Next, let's see if any of the Guatemala-specific variables are interesting. The remainder will (as they say) be left as an exercise for the reader.
+```{r}
+# from fear-geo.Rmd
+geo <- c('pais','estratopri','estratosec','prov','municipio')
+my_geo <- lapop.2014.all[,geo]
+my_geo$muni_uniq <- 10000*my_geo$pais + my_geo$municipio
+my_geo$fear <- fear_all
+muni_avg <- ddply(my_geo,~muni_uniq,summarize,x=mean(fear))
+my_geo$muni_avg <- muni_avg$x[match(my_geo$muni_uniq,muni_avg$muni_uniq)]
+
+# re-do imputation with location information
+# TODO: can I add muni_avg into the multiple regression without adding it to the MICE data frame? That should be possible.
+b.reggeo <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + 
+                               clien1n + d6 + ed2 + for1n_7 + for4_4 + 
+                               for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
+                               pol1 + pole2n + q3c_5 + sd3new2 + tr_idx + 
+                               ur + vb20_4 + w14a + www1 + my_geo$muni_avg))
+summary(b.reggeo)
+
+```
+
+So adding in all those other variables on top of `muni_avg` increases the adjusted R^2 to 0.3, over 0.22 with `muni_avg` alone and 0.19 with `muni_avg` excluded. 
+
+TODO: I could simplify the presentation of this by only doing the imputation and stepwise regression once -- just add `muni_avg` into what I did before and see how it impacts the significance of correlations. Which ones show the biggest changes in their (log) p-values? I could visualize this using a dot plot, maybe...
+
+# Guatemala #
+
+Next, let's see if any of the Guatemala-specific variables are interesting. 
 
 ```{r}
 g <- lapop.2014.GTM[,c(unused_common,unused_gtm)]
@@ -427,7 +420,147 @@ So what are the strongest correlates in Guatemala?
 
 We see some new themes, as well as some overlap with the region-wide trends.
 
-**El Salvador**
+# El Salvador #
+
+```{r}
+s <- lapop.2014.SLV[,c(unused_common,unused_slv)]
+is.na(s[s>800000]) <- TRUE
+s$fear_idx <- fear_slv
+s$ca_idx <- ca_all[lapop.2014.all$pais==3] # there is no ca_gtm
+s$tr_idx <- tr_slv
+s$w_idx <- w_slv
+s$crit_idx <- crit_all[lapop.2014.all$pais==3]
+s$aut_idx <- aut_all[lapop.2014.all$pais==3]
+idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx')
+
+cor_slv_bin <- ldply(c(bin_common,bin_slv), function(x) bin_cor(s,'fear_idx',x))
+cor_slv_ord <- ldply(c(ord_common,ord_slv), function(x) ord_cor(s,'fear_idx',x))
+cor_slv_idx <- ldply(idxs, function(x) ord_cor(s,'fear_idx',x))
+cor_slv_unord <- ldply(c(unord_common,unord_slv), function(x) 
+  unord_cor(s,'fear_idx',x))
+cor_slv <- rbind(cor_slv_bin,cor_slv_ord,cor_slv_unord,cor_slv_idx)
+cor_slv <- cor_slv[order(cor_slv$pval),]
+head(cor_slv,15)
+```
+
+TODO: elsdiso18 and elsdiso19 should probably be made part of the index for SLV, given their topics and incredibly low p-values.
+
+We see a lot of variables that should look familiar, plus some new ones:
+- elsvb55c: Uses newspaper as info source for voting decision (yes=more fearful)
+- elsvb55d: Uses internet...
+- elsvb55e: Uses facebook...
+- elsvb55i: Uses candidate forums
+- vicbar7f: # of occurrences of murders (TODO: should also be part of index)
+- info1: knows about Law of Access to Public Information (yes=more fear)
+
+A lot of these seem like measures for political engagement, with the more-engaged and better-informed people being more concerned about crime.
+
+```{r}
+unord_vars_s <- ldply(cor_slv_unord$var, function(x)
+  data.frame(var=strsplit(x,'_')[[1]][1],
+             val=as.numeric(strsplit(x,'_')[[1]][2]),
+             str=x,
+             stringsAsFactors=FALSE))
+for (i in 1:nrow(unord_vars_s)) {
+  s[,unord_vars_s$str[i]] <- as.numeric(s[,unord_vars_s$var[i]] == unord_vars_s$val[i])
+}
+s2 <- s[,cor_slv$var]
+s2$fear_idx <- s$fear_idx
+
+pm_s <- 1 - diag(ncol(s2))
+pm_s[,which(names(s2)=='fear_idx')] <- 0
+s_imp <- mice(s2,printFlag=F,predictorMatrix=pm_s)
+```
+
+Let's cut right to the chase and use stepwise regression on our multiply-imputed data:
+
+```{r}
+lm1s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,1)))
+lm2s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,2)))
+lm3s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,3)))
+lm4s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,4)))
+lm5s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,5)))
+step1s <- stepAIC(lm1s,direction="both",trace=F) # final AIC = 
+step2s <- stepAIC(lm2s,direction="both",trace=F) # final AIC = 
+step3s <- stepAIC(lm3s,direction="both",trace=F) # final AIC = 
+step4s <- stepAIC(lm4s,direction="both",trace=F) # final AIC = 
+step5s <- stepAIC(lm5s,direction="both",trace=F) # final AIC = 
+counts_s <- as.data.frame(table(c(names(coef(step1s)),names(coef(step2s)),
+                                names(coef(step3s)),names(coef(step4s)),
+                                names(coef(step5s)))),stringsAsFactors=F)
+counts_s[counts_s$Freq==5,'Var1']
+nrow(counts_s[counts_s$Freq==5,]) / nrow(counts_s) # 55% appear in all 5
+
+s.reg <- with(data=s_imp,exp=lm(fear_idx ~ ca_idx + cpss1 + elsdiso18 + elsdiso19 + elsvb55a + elsvb55e + gi0 + infra2 + it1 + pol1 + q11n_6 + sexi + tr_idx))
+summary(s.reg)
+```
+
+In El Salvador, our most significant correlations (other than the elsdisos, which I need TODO something with) are:
+
+- `ca_idx`
+
+
 
 **Honduras**
 
+```{r}
+h <- lapop.2014.HND[,c(unused_common,unused_hnd)]
+is.na(h[h>800000]) <- TRUE
+h$fear_idx <- fear_hnd
+h$ca_idx <- ca_hnd 
+h$tr_idx <- tr_hnd
+h$w_idx <- w_hnd
+h$crit_idx <- crit_hnd
+h$aut_idx <- aut_hnd
+idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx')
+
+cor_hnd_bin <- ldply(c(bin_common,bin_hnd), function(x) bin_cor(h,'fear_idx',x))
+cor_hnd_ord <- ldply(c(ord_common,ord_hnd), function(x) ord_cor(h,'fear_idx',x))
+cor_hnd_idx <- ldply(idxs, function(x) ord_cor(h,'fear_idx',x))
+cor_hnd_unord <- ldply(c(unord_common,unord_hnd), function(x) 
+  unord_cor(h,'fear_idx',x))
+cor_hnd <- rbind(cor_hnd_bin,cor_hnd_ord,cor_hnd_unord,cor_hnd_idx)
+cor_hnd <- cor_hnd[order(cor_hnd$pval),]
+head(cor_hnd,15)
+```
+
+
+```{r}
+unord_vars_h <- ldply(cor_hnd_unord$var, function(x)
+  data.frame(var=strsplit(x,'_')[[1]][1],
+             val=as.numeric(strsplit(x,'_')[[1]][2]),
+             str=x,
+             stringsAsFactors=FALSE))
+for (i in 1:nrow(unord_vars_h)) {
+  h[,unord_vars_h$str[i]] <- as.numeric(h[,unord_vars_h$var[i]] == unord_vars_h$val[i])
+}
+h2 <- h[,cor_hnd$var]
+h2$fear_idx <- h$fear_idx
+
+pm_h <- 1 - diag(ncol(h2))
+pm_h[,which(names(h2)=='fear_idx')] <- 0
+h_imp <- mice(h2,printFlag=F,predictorMatrix=pm_h)
+```
+
+Let's cut right to the chase and use stepwise regression on our multiply-imputed data:
+
+```{r}
+lm1h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,1)))
+lm2h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,2)))
+lm3h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,3)))
+lm4h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,4)))
+lm5h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,5)))
+step1h <- stepAIC(lm1h,direction="both",trace=F) # final AIC = 
+step2h <- stepAIC(lm2h,direction="both",trace=F) # final AIC = 
+step3h <- stepAIC(lm3h,direction="both",trace=F) # final AIC = 
+step4h <- stepAIC(lm4h,direction="both",trace=F) # final AIC = 
+step5h <- stepAIC(lm5h,direction="both",trace=F) # final AIC = 
+counts_h <- as.data.frame(table(c(names(coef(step1h)),names(coef(step2h)),
+                                names(coef(step3h)),names(coef(step4h)),
+                                names(coef(step5h)))),stringsAsFactors=F)
+counts_h[counts_h$Freq==5,'Var1']
+nrow(counts_h[counts_h$Freq==5,]) / nrow(counts_h) # 67% appear in all 5
+
+h.reg <- with(data=h_imp,exp=lm(fear_idx ~ a4_22 + aut_idx + b20 + clien1na + coer1 + gix4 + ico2 + it1 + mil10c + ocup4a_3 + per4 + pole2n + pr3e + prot3 + sd3new2 + tr_idx + ur))
+summary(h.reg)
+```
