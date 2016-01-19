@@ -186,7 +186,6 @@ cor_all_idx <- ldply(idxs, function(x) ord_cor(a,'fear_idx',x))
 cor_all_unord <- ldply(unord_common, function(x) unord_cor(a,'fear_idx',x))
 cor_all <- rbind(cor_all_bin,cor_all_ord,cor_all_unord,cor_all_idx)
 cor_all <- cor_all[order(cor_all$pval),]
-head(cor_all,15)
 ```
 
 While we have a list of which values of unordered categorical variables are significantly correlated with the fear index, the variables aren't formatted in a way that will be useful for multiple regression. We'll do this by creating dummy variables, with the same names as the `var` column in `cor_all`. (For example, `ocup1a_4` for `ocup1a == 4`.)
@@ -212,37 +211,7 @@ pm[,which(names(a2)=='fear_idx')] <- 0
 b <- mice(a2,printFlag=F,predictorMatrix=pm)
 ```
 
-Which values are significant?
-
-- `ur`: Urbanization
-- `it1`: Interpersonal trust
-- `tr_idx`: Trust in government index
-- `pole2n`: Satisfaction with police performance
-- `aut_idx`: Authoritarianism index
-- `pol1`: Interest in politics
-- `clien1n`: Knows someone offered benefit for vote
-- `mil10c`: Trustworthiness of Iranian government
-- `ocup4a == 3`: Actively looking for a job
-- `a4 == 5`: Believes crime is the most serious problem
-- `q3c == 5`: Evangelical/Protestant
-- `ca_idx`: Community activity index
-
-
-
-We see the usual suspects, plus:
-
-- `www1`: Internet usage
-- `ed`: Years of schooling
-- `ed2`: Education level of mother
-- `w_idx`: Wealth index
-- `sd3new2`: Satisfaction with public schools
-- `sd6new2`: Satisfaction with public health services
-- `pn4`: Satisfaction with democracy
-- `q14`: Intends to live or work abroad
-
-
-
-We can get to a decent set of variables using stepwise regression. What we'll do is run backward stepwise regression on each imputed dataset and keep only the ones that appear for all five sets.
+We can get to a decent set of variables using stepwise regression. What we'll do is run backward stepwise regression on each imputed dataset and keep only the ones that appear for all five sets. One can get pretty much the exact same result using forward regression (I checked).
 
 ```{r}
 b1 <- complete(b,1)
@@ -272,12 +241,6 @@ b.reg2 <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx +
                                for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
                                pol1 + pole2n + q3c_5 + sd3new2 + tr_idx + 
                                ur + vb20_4 + w14a + www1))
-summary(pool(b.reg2))
-```
-
-Trying to find a good way to visualize this result... Try a plot of the estimatated coefficient against the log significance.
-
-```{r}
 s <- summary(pool(b.reg2))
 plotme <- data.frame(s[-1,c(1,5)])
 plotme$log_p <- -log10(plotme[,2])
@@ -285,9 +248,20 @@ m <- max(plotme$log_p[plotme$log_p < Inf])
 plotme$log_p[plotme$log_p > m] <- 1.1*m
 scale <- c(1,1,1,1,1,10,8,1,1,1,4,4,4,1,4,4,1,4,1,1,1,1,5)
 plotme$est <- plotme$est * scale
+n = 0.02 # nudge factor
+nx = c(0,0,0,0,0,0,10*n,-5*n,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+ny = c(0,n,0,0,0,-n,2*n,n,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
 ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=rownames(plotme))) +
   geom_point(size=20,alpha=0.2) +
-  geom_text(color='black') +
+  geom_text(color='black',aes(x=log_p+nx, y=est+ny)) +
+  geom_segment(x=-log10(0.01),xend=-log10(0.01),
+               y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='red') +
+  annotate("text",x=-log10(0.01)+0.2,y=max(plotme$est),label='p=0.01',
+           color='red') +
+  geom_segment(x=-log10(0.05),xend=-log10(0.05),
+               y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='blue') +
+  annotate("text",x=-log10(0.05)-0.2,y=max(plotme$est),label='p=0.05',
+           color='blue') +
   scale_color_gradientn(colours=rainbow(4)) +
   theme_classic() +
   theme(legend.position='none') +
@@ -295,13 +269,31 @@ ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=rownames(plotme))) +
   ylab('Influence on fear index')
 ```
 
-This returns all of the variables we found by looking at the first multiple correlation (`it1`, `ur`, `tr_idx`, `ca_idx`, `aut_idx`, `q3c_5`, `pole2n`, `pol1`, `a4_5`, `mil10c`, `clien1n`, `ocup4a_3`), as well as the two additional variables we got by the informal "pruning" procedure above (`for6`,`aoj22_1`). The correlation with `www1` is significant now; others have weaker significance. 
-
-TODO: What happens with forward stepwise regression?
-TODO: Incorporate muni-level averaging (as in fear-geo.Rmd) to see which hold up best independently of location.
+Variable  |Description                                    |Effect
+----------|-----------------------------------------------|-------
+`it1`     |Interpersonal trust                            |Less trust = more fear
+`ur`      |Urbanization                                   |Urban = more fear  
+`tr_idx`  |Trust in government                            |Less trust = more fear
+`ca_idx`  |Community activity                             |More involvement = more fear
+`aut_idx` |Authoritarianism                               |More authoritarian = more fear
+`q3c = 5` |Evangelical/Protestant                         |More fearful
+`pole2n`  |Satisfaction with police performance           |Less satisfied = more fearful
+`for6`    |Influence of China in country                  |More influence = more fear
+`pol1`    |Interest in politics                           |More interest = more fear
+`a4 = 5`  |Believes crime is the most serious problem     |More fearful
+`mil10c`  |Trustworthiness of Iranian government          |More trustworthy = more fear
+`aoj22=1` |Reduce crime via preventative measures         |Less fearful
+`clien1n` |Knows someone offered benefit for vote         |Yes = more fear
+`ocup4a=3`|Actively looking for a job                     |More fearful
+`www1`    |Internet usage                                 |Frequent = more fear
+`w14a`    |Abortion justified when mother's health at risk|Yes = more fear
+`sd3new2` |Satisfaction with public schools               |Dissatisfaction = more fear
+`ed2`     |Education level of mother                      |More educated = more fear
+`vb20 = 4`|Plans to leave ballot blank in next election   |More fearful
+`d6`      |Approval of same-sex marriage                  |Approving = more fear 
+`for5 = 6`|Best model for future development is Russia    |More fearful
 
 ```{r}
-# from fear-geo.Rmd
 geo <- c('pais','estratopri','estratosec','prov','municipio')
 my_geo <- lapop.2014.all[,geo]
 my_geo$muni_uniq <- 10000*my_geo$pais + my_geo$municipio
@@ -309,20 +301,42 @@ my_geo$fear <- fear_all
 muni_avg <- ddply(my_geo,~muni_uniq,summarize,x=mean(fear))
 my_geo$muni_avg <- muni_avg$x[match(my_geo$muni_uniq,muni_avg$muni_uniq)]
 
-# re-do imputation with location information
-# TODO: can I add muni_avg into the multiple regression without adding it to the MICE data frame? That should be possible.
-b.reggeo <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + 
-                               clien1n + d6 + ed2 + for1n_7 + for4_4 + 
+b.reggeo <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx +
+                                 clien1n + d6 + ed2 + for1n_7 + for4_4 + 
                                for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
                                pol1 + pole2n + q3c_5 + sd3new2 + tr_idx + 
                                ur + vb20_4 + w14a + www1 + my_geo$muni_avg))
-summary(b.reggeo)
-
+s_geo <- summary(pool(b.reggeo))
+plotme$geo_est <- s_geo[c(-1,-25),1]
+plotme$geo_logp <- -log10(s_geo[c(-1,-25),5])
+m <- max(plotme$geo_logp[plotme$geo_logp < Inf])
+plotme$geo_logp[plotme$geo_logp > m] <- 1.1*m
+plotme$geo_est <- plotme$geo_est * scale
+nx = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5*n,0,0,0,0,0,0)
+ny = c(0,0,0,0,0,2*n,2.5*n,0,0,0,-n,0,0,0,0,0,0,0,0,0,-1.5*n,-2*n,0)
+ggplot(data=plotme,aes(x=geo_logp,y=geo_est,color=geo_est,
+                       label=rownames(plotme))) +
+  geom_point(size=20,alpha=0.2) +
+  geom_segment(aes(x=plotme$log_p,y=plotme$est,
+                   xend=plotme$geo_logp,yend=plotme$geo_est,
+                   color=geo_est)) +
+  geom_text(color='black',aes(x=geo_logp+nx, y=geo_est+ny)) +
+  geom_segment(x=-log10(0.01),xend=-log10(0.01),
+               y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='red') +
+  annotate("text",x=-log10(0.01)+0.2,y=max(plotme$est),label='p=0.01',
+           color='red') +
+  geom_segment(x=-log10(0.05),xend=-log10(0.05),
+               y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='blue') +
+  annotate("text",x=-log10(0.05)-0.2,y=max(plotme$est),label='p=0.05',
+           color='blue') +
+  scale_color_gradientn(colours=rainbow(4)) +
+  theme_classic() +
+  theme(legend.position='none') +
+  xlab('Significance (-log(p))') +
+  ylab('Influence on fear index')
 ```
 
-So adding in all those other variables on top of `muni_avg` increases the adjusted R^2 to 0.3, over 0.22 with `muni_avg` alone and 0.19 with `muni_avg` excluded. 
-
-TODO: I could simplify the presentation of this by only doing the imputation and stepwise regression once -- just add `muni_avg` into what I did before and see how it impacts the significance of correlations. Which ones show the biggest changes in their (log) p-values? I could visualize this using a dot plot, maybe...
+When we include the municipality averages in our multiple correlation, we're asking about the factors that make a person more fearful than others in their community. The straight lines attached to each circle illustrate how much they moved from the previous plot -- for example, `tr_idx` became dramatically less significant while `mil10c` hardly moved at all. This suggests that people's trust in their own government (`tr_idx`) correlates strongly with their municipality, while views on the Iranian government (`mil10c`) serve more to differentiate people within the same community. In general, most variables have a smaller estimated influence, but most significant variables remain significant -- some actually even increase. This means that we're measuring more than just attributes of places; these variables are telling us about people within heterogeneous places.
 
 # Guatemala #
 
@@ -347,7 +361,6 @@ cor_gtm_unord <- ldply(c(unord_common,unord_gtm), function(x)
   unord_cor(g,'fear_idx',x))
 cor_gtm <- rbind(cor_gtm_bin,cor_gtm_ord,cor_gtm_unord,cor_gtm_idx)
 cor_gtm <- cor_gtm[order(cor_gtm$pval),]
-head(cor_gtm,15)
 ```
 
 We definitely see a few variables that weren't on the menu before; some of these we might want to add into the indices we have.
@@ -396,6 +409,8 @@ g.reg <- with(data=g_imp,exp=lm(fear_idx ~ a4_27 + a4_5 + aoj21_1 + aoj21_2 +
 summary(g.reg)
 ```
 
+TODO: Add scatter plot visualization for GTM.
+
 So what are the strongest correlates in Guatemala?
 
 - `fear6e`: Insecurity on public transportation (add to index?)
@@ -443,7 +458,7 @@ cor_slv <- cor_slv[order(cor_slv$pval),]
 head(cor_slv,15)
 ```
 
-TODO: elsdiso18 and elsdiso19 should probably be made part of the index for SLV, given their topics and incredibly low p-values.
+TODO: elsdiso18 and elsdiso19 should probably be made part of the index for SLV, given their topics and incredibly low p-values. Rather than adding on to the end of fear.Rmd, rename it as fear_HND.Rmd and make a new copy for GTM.
 
 We see a lot of variables that should look familiar, plus some new ones:
 - elsvb55c: Uses newspaper as info source for voting decision (yes=more fearful)
@@ -495,6 +510,8 @@ s.reg <- with(data=s_imp,exp=lm(fear_idx ~ ca_idx + cpss1 + elsdiso18 + elsdiso1
 summary(s.reg)
 ```
 
+TODO: Add scatter plot visualization here also.
+
 In El Salvador, our most significant correlations (other than the elsdisos, which I need TODO something with) are:
 
 - `ca_idx`
@@ -521,7 +538,6 @@ cor_hnd_unord <- ldply(c(unord_common,unord_hnd), function(x)
   unord_cor(h,'fear_idx',x))
 cor_hnd <- rbind(cor_hnd_bin,cor_hnd_ord,cor_hnd_unord,cor_hnd_idx)
 cor_hnd <- cor_hnd[order(cor_hnd$pval),]
-head(cor_hnd,15)
 ```
 
 
@@ -562,5 +578,26 @@ counts_h[counts_h$Freq==5,'Var1']
 nrow(counts_h[counts_h$Freq==5,]) / nrow(counts_h) # 67% appear in all 5
 
 h.reg <- with(data=h_imp,exp=lm(fear_idx ~ a4_22 + aut_idx + b20 + clien1na + coer1 + gix4 + ico2 + it1 + mil10c + ocup4a_3 + per4 + pole2n + pr3e + prot3 + sd3new2 + tr_idx + ur))
-summary(h.reg)
+h_s <- summary(h.reg)
+```
+
+Now let's visualize the same way we did with the regional correlations.
+
+```{r}
+plotme_h <- data.frame(h_s[-1,c(1,5)])
+plotme_h$log_p <- -log10(plotme_h[,2])
+m <- max(plotme_h$log_p[plotme_h$log_p < Inf])
+plotme_h$log_p[plotme_h$log_p > m] <- 1.1*m
+# TODO: these numbers aren't right anymore; check for the real ones
+scale <- c(1,1,1,1,1,10,8,1,1,1,4,4,4,1,4,4,1,4,1,1,1,1,5)
+plotme_h$est <- plotme_h$est * scale
+# TODO: Add title to plot (all of them)
+ggplot(data=plotme_h,aes(x=log_p,y=est,color=est,label=rownames(plotme_h))) +
+  geom_point(size=20,alpha=0.2) +
+  geom_text(color='black') +
+  scale_color_gradientn(colours=rainbow(4)) +
+  theme_classic() +
+  theme(legend.position='none') +
+  xlab('Significance (-log(p))') +
+  ylab('Influence on fear index')
 ```
