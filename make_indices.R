@@ -9,6 +9,8 @@ library(ggplot2)
 lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
+# vic1exta asks about the frequency of crime victimization and is NR if 
+# respondant was never victimized; change this to zero
 lapop.2014.HND$vic1exta[lapop.2014.HND$vic1exta == 999999] <-  0
 lapop.2014.GTM$vic1exta[lapop.2014.GTM$vic1exta == 999999] <- 0
 lapop.2014.SLV$vic1exta[lapop.2014.SLV$vic1exta == 999999] <- 0
@@ -65,10 +67,14 @@ fear_common <- c('vic44','fear10','vic1ext','vic1exta','vic1hogar','aoj11',
 fear_hnd <- make_idx(lapop.2014.HND,
                      c(fear_common,'vic40','vic41','vic43','vic45','fear6f'))
 fear_gtm <- make_idx(lapop.2014.GTM,
-                     c(fear_common,'vic40','vic41','vic43','fear6f'),
+                     c(fear_common,'vic40','vic41','vic43','fear6e','fear6f'),
                      sgn=-1)
 fear_slv <- make_idx(lapop.2014.SLV,fear_common)
 fear_all <- make_idx(lapop.2014.all,fear_common)
+# NOTE: in HND, vic40-vic45 take values of 1=yes and 2=no
+# in GTM, they take values of 0=no and 1=yes
+# This doesn't affect fear_all, since they aren't used at all in SLV; just
+# be careful with these particular variables.
 
 ###############################################################################
 ## Community Activity Index
@@ -150,4 +156,7 @@ aut_all_data$dem2[aut_all_data$dem2==1] <- 100
 aut_all_data$dem2[aut_all_data$dem2==2] <- 1
 aut_all_data$dem2[aut_all_data$dem2==100] <- 2
 aut_all <- make_idx(aut_all_data,names(aut_all_data))
+
+# TODO: Clean up the variables that won't be needed by whatever other 
+# files call this one.
 
