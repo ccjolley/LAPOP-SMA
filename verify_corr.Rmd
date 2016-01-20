@@ -319,6 +319,7 @@ b.reggeo <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx +
                                for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
                                pol1 + pole2n + q3c_12 + q3c_5 + sd3new2 + tr_idx + 
                                ur + vb20_4 + w14a + www1 + my_geo$muni_avg))
+
 s_geo <- summary(pool(b.reggeo))
 plotme$geo_est <- s_geo[c(-1,-27),1]
 plotme$geo_logp <- -log10(s_geo[c(-1,-27),5])
@@ -347,7 +348,7 @@ ggplot(data=plotme,aes(x=geo_logp,y=geo_est,color=geo_est,
   theme(legend.position='none') +
   xlab('Significance (-log(p))') +
   ylab('Influence on fear index')
-#TODO: Factor this out into a function as well
+#TODO: Factor this out into a function as well -- might require moving a couple pieces of lm_plot() out into something else.
 
 ```
 
@@ -403,14 +404,14 @@ lm_plot(g.reg,g2)
 Variable         |Description                                  |Effect
 -----------------|---------------------------------------------|------------------------
 `ur`             |Urbanizaton                                  |Urban = more fearful
-`aoj21 = 8`     |Biggest threat = none of the above           |Less fearful
-`aoj21 = 2`     |Gangs are biggest threat to security         |More fearful
-`leng4 = 1`     |Parents only speak Spanish (not indigenous)  |More fearful
+`aoj21 = 8`      |Biggest threat = none of the above           |Less fearful
+`aoj21 = 2`      |Gangs are biggest threat to security         |More fearful
+`leng4 = 1`      |Parents only speak Spanish (not indigenous)  |More fearful
 `it1`            |Interpersonal trust                          |Less trust = more fear
 `pv_idx`         |Political violence index                     |More violence = more fear
-`a4 = 5`        |Crime the biggest problem                    |More fearful
+`a4 = 5`         |Crime the biggest problem                    |More fearful
 `tr_idx`         |Trust in government index                    |Less trust = more fear
-`vb20 = 4`      |Plans to vote but leave ballot blank         |More fear
+`vb20 = 4`       |Plans to vote but leave ballot blank         |More fear
 `aut_idx`        |Authoritarianism index                       |More authoritarian = more fear
 `pv3`            |Believes violence was used in 2015 elections |More belief = more fear
 `dvw1`           |Husband can hit wife if she neglects chores  |Less approving = more fear
@@ -542,3 +543,4 @@ Variable         |Description                                     |Effect
 `prot3`          |Participated in a protest                       |Yes = more fear
 `b20`            |Trust in Catholic Church                        |Less trust = more fear
 
+TODO: Check all 3 of my fear_XXX.Rmd files; make sure that the max and min values of the fear indices are *exactly* the same as what I see here, so that I'm comparing apples to apples.
