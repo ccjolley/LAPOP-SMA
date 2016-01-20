@@ -14,6 +14,12 @@ lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.HND$vic1exta[lapop.2014.HND$vic1exta == 999999] <-  0
 lapop.2014.GTM$vic1exta[lapop.2014.GTM$vic1exta == 999999] <- 0
 lapop.2014.SLV$vic1exta[lapop.2014.SLV$vic1exta == 999999] <- 0
+# vicbar1f is similar; asks about the number of occurrences of burglaries
+lapop.2014.HND$vicbar1f[lapop.2014.HND$vicbar1f == 999999] <-  0
+lapop.2014.GTM$vicbar1f[lapop.2014.GTM$vicbar1f == 999999] <- 0
+lapop.2014.SLV$vicbar1f[lapop.2014.SLV$vicbar1f == 999999] <- 0
+# vicbar7f asks about the number of occurences of murders (SLV only)
+lapop.2014.SLV$vicbar7f[lapop.2014.SLV$vicbar7f == 999999] <- 0
 common <- Reduce(intersect,list(names(lapop.2014.GTM),names(lapop.2014.SLV),
                                 names(lapop.2014.HND)))
 lapop.2014.all <- rbind(lapop.2014.GTM[,common],lapop.2014.SLV[,common],
@@ -69,7 +75,8 @@ fear_hnd <- make_idx(lapop.2014.HND,
 fear_gtm <- make_idx(lapop.2014.GTM,
                      c(fear_common,'vic40','vic41','vic43','fear6e','fear6f'),
                      sgn=-1)
-fear_slv <- make_idx(lapop.2014.SLV,fear_common)
+fear_slv <- make_idx(lapop.2014.SLV,c(fear_common,'vicbar7f','elsdiso18',
+                                      'elsdiso19'))
 fear_all <- make_idx(lapop.2014.all,fear_common)
 # NOTE: in HND, vic40-vic45 take values of 1=yes and 2=no
 # in GTM, they take values of 0=no and 1=yes
@@ -86,8 +93,6 @@ ca_hnd <- make_idx(lapop.2014.HND,
 ca_all <- make_idx(lapop.2014.all,
                    c('cp5','cp7','cp8','cp13','cp20'),sgn=-1)
 sanity_check(lapop.2014.all,ca_all,'cp7')
-
-# cp21 in SLV should be added to community activity index
 
 ###############################################################################
 ## Political violence Index (Guatemala only)
