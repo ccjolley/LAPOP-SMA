@@ -1,0 +1,210 @@
+---
+title: "LAPOP"
+author: "Craig Jolley"
+date: "January 20, 2016"
+output: html_document
+---
+
+Calculating some high-level summary points for the LAPOP datasets.
+
+```{r}
+library(plyr)
+library(ggplot2)
+library(lubridate)
+library(VennDiagram)
+library(RColorBrewer)
+
+# Load data
+lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
+# Get useful non-numeric variables
+date_time <- rbind(lapop.2014.GTM[,c('pais','fecha','ti')],
+                   lapop.2014.SLV[,c('pais','fecha','ti')],
+                   lapop.2014.HND[,c('pais','fecha','ti')])
+
+
+fixdata <- function(x) {
+  y <- x
+  # vic1exta asks about the frequency of crime victimization and is NR if 
+  # respondant was never victimized; change this to zero
+  y$vic1exta[y$vic1exta == 999999] <- 0
+  # vicbar1f is similar; asks about the number of occurrences of burglaries
+  y$vicbar1f[y$vicbar1f == 999999] <-  0
+  # vicbar7f asks about the number of occurences of murders (SLV only)
+  if ('vicbar7f' %in% names(y)) {
+    y$vicbar7f[y$vicbar7f == 999999] <- 0
+  }
+  # set uniq_id to 0 (so it doesn't become NA)
+  y$uniq_id <- 0
+  # somehow ages got imported as strings
+  y$q2 <- as.numeric(y$q2)
+  # set non-responses to NA
+  y[y > 800000] <- NA
+  y
+}
+
+lapop.2014.GTM <- fixdata(lapop.2014.GTM)
+lapop.2014.SLV <- fixdata(lapop.2014.SLV)
+lapop.2014.HND <- fixdata(lapop.2014.HND)
+
+# create a combined dataset
+common <- Reduce(intersect,list(names(lapop.2014.GTM),names(lapop.2014.SLV),
+                                names(lapop.2014.HND)))
+lapop.2014.all <- rbind(lapop.2014.GTM[,common],lapop.2014.SLV[,common],
+                        lapop.2014.HND[,common])
+
+```
+
+# Basic features #
+
+```{r}
+basic <- data.frame(country=c('Guatemala','El Salvador','Honduras'),
+                    nq=c(ncol(lapop.2014.GTM),ncol(lapop.2014.SLV),
+                         ncol(lapop.2014.HND)),
+                    nr=c(nrow(lapop.2014.GTM),nrow(lapop.2014.SLV),
+                         nrow(lapop.2014.HND)))
+# num of questions
+ggplot(basic,aes(x=country,y=nq,fill=country)) +
+  geom_bar(stat="identity") +
+  ggtitle("Number of questions") +
+  geom_text(aes(y=nq,label=nq,vjust=1.5),size=10) +
+  scale_fill_manual(values=brewer.pal(3,"Dark2")) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line=element_blank(),
+        axis.title=element_blank(),
+        text=element_text(size=20))
+
+# num of responses
+ggplot(basic,aes(x=country,y=nr,fill=country)) +
+  geom_bar(stat="identity") +
+  ggtitle("Number of responses") +
+  geom_text(aes(y=nr,label=nr,vjust=1.5),size=10) +
+    scale_fill_manual(values=brewer.pal(3,"Dark2")) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line=element_blank(),
+        axis.title=element_blank(),
+        text=element_text(size=20))
+# Venn diagram of overlapping questions
+plot.new()
+draw.triple.venn(ncol(lapop.2014.GTM),ncol(lapop.2014.SLV),ncol(lapop.2014.GTM),
+                 sum(names(lapop.2014.GTM) %in% names(lapop.2014.SLV)),
+                 sum(names(lapop.2014.SLV) %in% names(lapop.2014.HND)),
+                 sum(names(lapop.2014.GTM) %in% names(lapop.2014.HND)),
+                 ncol(lapop.2014.all),
+                 category=c('Guatemala','El Salvador','Honduras'),
+                 fill=brewer.pal(3,"Dark2")[c(2,1,3)],
+                 cex=rep(3,7),cat.cex=rep(3,3),
+                 alpha=rep(0.1,3),col=rep(NA,3),
+                 cat.just=list(c(0,0.5),c(1,0.5),c(0.5,0)),
+                 euler.d=TRUE,scaled=TRUE)
+
+# Questions with time series
+```
+
+# Missing values #
+
+```{r}
+# Average missing values
+mean(is.na(lapop.2014.GTM)) # 8.9% in GTM
+mean(is.na(lapop.2014.SLV)) # 9.0% in SLV
+mean(is.na(lapop.2014.HND)) # 9.9% in HND
+mean(is.na(lapop.2014.all)) # 8.2% in overlap
+# Missing values per row
+missing_row <- rbind(data.frame(x=rowMeans(is.na(lapop.2014.GTM)),country='GTM'),
+                     data.frame(x=rowMeans(is.na(lapop.2014.SLV)),country='SLV'),
+                     data.frame(x=rowMeans(is.na(lapop.2014.HND)),country='HND'),
+                     data.frame(x=rowMeans(is.na(lapop.2014.all)),country='all'))
+ggplot(missing_row,aes(x=x,fill=country)) +
+  geom_density(alpha=0.2) +
+  theme_classic() +
+  xlab('Missing values per row') +
+  scale_fill_manual(values=brewer.pal(4,"Dark2")[c(2,1,3,4)]) +
+  scale_x_continuous(limits=c(0,0.3)) +
+  theme(axis.ticks=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
+
+head(sort(colMeans(is.na(lapop.2014.GTM)),decreasing=TRUE))
+head(sort(colMeans(is.na(lapop.2014.SLV)),decreasing=TRUE))
+head(sort(colMeans(is.na(lapop.2014.HND)),decreasing=TRUE))
+head(sort(colMeans(is.na(lapop.2014.all)),decreasing=TRUE))
+quantile(colMeans(is.na(lapop.2014.GTM)))
+quantile(colMeans(is.na(lapop.2014.SLV)))
+quantile(colMeans(is.na(lapop.2014.HND)))
+quantile(colMeans(is.na(lapop.2014.all)))
+```
+
+The most common missing responses are for:
+
+- `vb101`: Reason for nullifying ballot (98.3%)
+- `exc14`: Paid a bribe at the courts (95.6%)
+- `vic2`: Type of victimization (82.3%)
+- `vic2aa`: Location of victimization (82.2%)
+- `exc11`: Bribe required to process document in municipal government (77.5%)
+- `vb4new`: Reason for not voting (74.7%)
+
+In general, questions with many missing answers were requesting information about fairly unusual experiences. In all cases, 50% of questions have missing-answer rates of less than 1-2%.
+
+# Survey dates #
+
+For some reason, a single response in Guatemala was from 1/1/2012, while the rest are from the spring of 2014
+
+```{r}
+Sys.setlocale("LC_TIME", "usa")
+date_time <- date_time[-1407,] # remove outlier
+date_time$date <- dmy(date_time$fecha)
+countries <- c(NA,'Guatemala','El Salvador','Honduras')
+date_time$country <- countries[date_time$pais]
+ggplot(date_time,aes(x=date,fill=country)) +
+  geom_density(alpha=0.2,adjust=0.25) +
+  scale_fill_manual(values=brewer.pal(3,"Dark2")) +
+  theme_classic() +
+  xlab('Survey date (2014)') +
+  theme(axis.ticks=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
+
+
+ggplot(date_time,aes(x=ti,fill=country)) +
+  geom_density(alpha=0.2,adjust=0.25) +
+  scale_x_continuous(limits=c(15,90)) +
+  scale_fill_manual(values=brewer.pal(3,"Dark2")) +
+  theme_classic() +
+  xlab('Survey time (minutes)') +
+  theme(axis.ticks=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
+```
+
+Most people took 30-60 minutes to complete the survey.
+
+# Basic Demographics #
+
+```{r}
+mean(lapop.2014.all$sex==2) # 51.8% female
+ages <- lapop.2014.all[,c('pais','q2')]
+ages$country <- countries[ages$pais]
+ggplot(ages,aes(x=q2,fill=country)) +
+  geom_density(alpha=0.2) +
+  theme_classic() +
+  xlab('Age (years)') +
+  scale_fill_manual(values=brewer.pal(3,"Dark2")) +
+  theme(axis.ticks=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
+
