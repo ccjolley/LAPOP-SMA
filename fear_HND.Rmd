@@ -12,8 +12,10 @@ This time around, let’s go with the big list:
 - vic41: Out of fear of crime, has limited the places to go for recreation (1=yes, 2=no) 
 - vic43: Out of fear of crime, has felt the need to change neighborhoods (1=yes, 2=no) 
 - vic44: Organized in Neighborhood for Security (0 = no, 1=yes) 
-- vic45: Out of fear of crime, has changed jobs (1=yes, 2=no) - fear10: Avoided Walking Through Dangerous Areas  (0=no, 1=yes) 
-- fear6f: Insecurity at Schools (1 = a lot, 4 = not at all) - vic1ext: Victim of Crime (1=yes, 2=no) 
+- vic45: Out of fear of crime, has changed jobs (1=yes, 2=no) 
+- fear10: Avoided Walking Through Dangerous Areas  (0=no, 1=yes) 
+- fear6f: Insecurity at Schools (1 = a lot, 4 = not at all) 
+- vic1ext: Victim of Crime (1=yes, 2=no) 
 - vic1exta: Victim of Crime (Frequency) (999999 if vic1ext=2, otherwise max=15) 
 - vic1hogar: Other Victim of Crime in Household (1=yes, 2=no)
 - aoj11: Perception of Neighborhood Security (1 = safe, 4 = unsafe) 
@@ -39,52 +41,112 @@ library(ggplot2)
 library(mice)
 library(plyr)
 library(GGally)
-my_data <- lapop.2014.HND[,c('vic40', 'vic41', 'vic44', 'vic43',
+my_data <- lapop.2014.HND[,c('vic40', 'vic41', 'vic44', 'vic43','vic45',
                              'fear10','fear6f','vic1ext','vic1exta',
                              'vic1hogar','aoj11','pese1','pese2','aoj17',
                              'diso7','diso8','diso10','diso18','diso14',
                              'diso16','diso17','vicbar1','vicbar1f',
                              'vicbar3','vicbar4','vicbar7')]
-my_data$vic1exta[my_data$vic1exta == 999999] <- 0
-is.na(my_data[my_data>30]) <- TRUE
-is.na(my_data[my_data>30]) <- TRUE
+my_data$vic1exta[my_data$vic1exta > 800000] <- 0
+my_data$a4 <- as.numeric(lapop.2014.HND$a4 %in% c(5,14,27,30,57))
+is.na(my_data[my_data>800000]) <- TRUE
 
 my_complete <- na.omit(my_data)
 pr_complete <- prcomp(my_complete, center = TRUE, scale = FALSE)
-plot(pr_complete)
-
-summary(pr_complete)
+# save this to plot later
+s <- summary(pr_complete)
+df <- data.frame(t(s$importance))
+names(df) <- c('stdev','proportion','cum')
+df$pc <- 1:nrow(df)
 ```
 
-Only 39% of total variance winds up in the first component.
+44% of total variance winds up in the first component.
+
 ```{r}
 my_imp <- mice(my_data, printFlag = F)
-my_imp
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
-Moving onto the PCA:
+Now calculate PCA for each of the imputed datasets.
+
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
-plot(pr[[1]])
-summary(pr[[1]])
+s1 <- summary(pr[[1]])
+df1 <- data.frame(t(s1$importance))
+names(df1) <- c('stdev','proportion','cum')
+df1$pc <- 1:nrow(df1)
+df1$group <- 'after'
+df$group <- 'before'
+df1 <- rbind(df,df1)
+ggplot(df1,aes(x=pc,y=cum,color=group)) +
+  geom_point(size=5) +
+  geom_line(size=2) +
+  scale_y_continuous(limits=c(0,1)) +
+  xlab('Principal component') +
+  ylab('Cumulative variance') +
+  annotate('text',x=2,y=df$cum[1],hjust=0,size=10,color='#2A3132',
+           label=paste(round(df$cum[1]*100),'% variance in PC1',sep='')) +
+  theme_classic() +
+  theme(legend.title=element_blank(),
+        axis.ticks=element_blank(),
+        text=element_text(size=20))
 ```
 
 Imputation actually increased the fraction of variance in the first component to 44%.
 ```{r}
-pc1 <- pr[[1]]$x[,1]
-pc2 <- pr[[1]]$x[,2]
-qplot(pc1,pc2)
+PC1 <- pr[[1]]$x[,1]
+PC2 <- pr[[1]]$x[,2]
+qplot(PC1,PC2) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.text=element_blank(),
+        axis.line=element_blank(),
+        text=element_text(size=20))
 ```
 
 ```{r}
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
 ggpairs(all_pc1) + theme_classic()
-
-all_pc1$avg <- rowMeans(all_pc1)
-quantile(all_pc1$avg)
 ```
 Plot of PC1 vs PC2 shows a much smoother distribution than before; this probably isn’t dominated by a singe discrete variable. Correlations for different imputed datasets are about 0.997 – imputation is much more consistent when you use more data.
+
+```{r}
+all_pc1$avg <- rowMeans(all_pc1)
+qchange <- data.frame(low=colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE),
+                      hi=colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE))
+qchange$slope <- qchange$hi - qchange$low
+qchange$label <- rownames(qchange)
+qchange$even <- rank(qchange$hi)/nrow(qchange)*max(qchange$hi)
+ggplot(data=qchange) +
+  geom_segment(aes(x=0,y=qchange$low,xend=1,yend=qchange$hi,
+                   color=qchange$slope),size=1) +
+  scale_color_gradient(low='#FF420E',high='#89DA59') +
+  geom_text(aes(x=1,y=(qchange$even+qchange$hi)/2,label=qchange$label,
+                hjust=0,color=qchange$slope),size=5) +
+  annotate("text",x=0,y=0,label='Average in lowest quartile',hjust=0) +
+  annotate("text",x=1,y=0,label='Average in highest quartile',hjust=1) +
+  scale_x_continuous(limits=c(0,1.5)) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title=element_blank(),
+        text=element_text(size=20))
+```
 
 Compared to the lowest quantile, the highest quantile of our proposed index has:
 
@@ -93,7 +155,7 @@ Higher values for vic40, vic41, vic43, fear6f (higher values of these mean less 
 So it looks like (as before) high values of the index indicate not being particularly concerned about crime and violence.
 ```{r}
 all_pc1$norm <- scale(-all_pc1$avg) # sign flip -- now high values mean more fear
-predict_data <- data.frame(vic40 = c(2,1), vic41 = c(2,1), vic43 = c(2,1), 
+predict_data <- data.frame(vic40 = c(2,1), vic41 = c(2,1), vic43 = c(2,1), vic45=c(2,1),
                            vic44 = c(0,1), fear10 = c(0,1), 
                            fear6f = c(4,1), vic1ext = c(2,1),vic1exta=c(0,15),
                            vic1hogar=c(2,1),aoj11=c(1,4),pese1=c(3,1),
@@ -101,7 +163,7 @@ predict_data <- data.frame(vic40 = c(2,1), vic41 = c(2,1), vic43 = c(2,1),
                            diso10=c(5,1),diso18=c(5,1),diso14=c(5,1),
                            diso16=c(5,1),diso17=c(5,1),vicbar1=c(2,1),
                            vicbar1f=c(3,1),vicbar3=c(2,1),vicbar4=c(2,1),
-                           vicbar7=c(2,1))
+                           vicbar7=c(2,1),a4=c(0,1))
 
 minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
 minmax <- (mean(all_pc1$avg) - minmax) / sd(all_pc1$avg)
@@ -109,9 +171,7 @@ minmax <- (mean(all_pc1$avg) - minmax) / sd(all_pc1$avg)
 quantile(all_pc1$norm)
 
 fear <- data.frame(w=all_pc1$norm) 
-```
-```{r}
-predict_data2 <- data.frame(diag(25))
+predict_data2 <- data.frame(diag(27))
 names(predict_data2) <- names(predict_data)
 # right now, you have something that would feed 0's and 1's into your score
 # prediction -- this doesn't really make sense because many of your questions
@@ -119,8 +179,12 @@ names(predict_data2) <- names(predict_data)
 predict_data2$vic40 <- 2 - predict_data2$vic40
 predict_data2$vic41 <- 2 - predict_data2$vic41
 predict_data2$vic43 <- 2 - predict_data2$vic43
+# vic44 should be binary
+predict_data2$vic45 <- 2 - predict_data2$vic45
 predict_data2$fear6f <- 4 - 3*predict_data2$fear6f 
+# fear10 should be binary
 predict_data2$vic1ext <- 2 - predict_data2$vic1ext
+# vic1exta should be binary
 predict_data2$vic1hogar <- 2 - predict_data2$vic1hogar
 predict_data2$aoj11 <- 1 + 3*predict_data2$aoj11
 predict_data2$aoj17 <- 4 - 3*predict_data2$aoj17
@@ -138,6 +202,7 @@ predict_data2$vicbar1f <- 3 - 2*predict_data2$vicbar1f
 predict_data2$vicbar3 <- 2 - predict_data2$vicbar3
 predict_data2$vicbar4 <- 2 - predict_data2$vicbar4
 predict_data2$vicbar7 <- 2 - predict_data2$vicbar7
+# a4 should be binary
 ```
 
 Now, in each row of predict_data2, all values are those that will give a lower score, except for one.
@@ -151,27 +216,28 @@ Now you can see that all of the scores are reasonably close to the minimum value
 diff <- data.frame(d=(scores-minmax[1]), n = names(predict_data))
 ggplot(diff, aes(x=n,y=d)) + 
   geom_bar(stat = 'identity', fill = 'skyblue') + 
+  ylab('Influence on fear index of 1-point change') +
   coord_flip() + 
   theme_classic() + 
   theme(text = element_text(size=20), 
-        axis.title.y = element_blank(),
-        axis.title.x = element_blank())
+        axis.ticks = element_blank(),
+        axis.title.y = element_blank())
 ```
 
 So vic45 (changing jobs out of fear of crime) and a4 (what is the biggest problem?) don’t have a really strong influence here; we might want to drop them from the index. The ones that really dominate here are the diso indicators, asking people what they feel is a problem in their neighborhood.
 
 ```{r}
-fear10 <- data.frame(q=my_data$fear10,w=fear$w)
-my_lm <- lm(data=fear10, q ~ w)
+vic44 <- data.frame(q=my_data$vic44,w=fear$w)
+my_lm <- lm(data=vic44, q ~ w)
 summary(my_lm)
 
-ggplot(fear10,aes(x=w,y=q)) +
+ggplot(vic44,aes(x=w,y=q)) +
   geom_jitter(color='tomato3',size=5,alpha=0.2) +
   theme_classic() +
   geom_smooth(method='lm',size=2,color='royalblue') +
   annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
   size=10,x=-1.5,y=1,hjust=0,vjust=0,color='royalblue') +
-  ylab('fear10') +
+  ylab('vic44: Organized in neighborhood for security') +
   xlab('Fear index') +
   theme(text=element_text(size=20))
 ```
@@ -199,41 +265,72 @@ This is a good correlation, but it’s not nearly as strong as what we saw with 
 ```{r}
 diso8 <- data.frame(q=my_data$diso8,w=fear$w)
 my_lm <- lm(data=diso8, q ~ w)
-summary(my_lm)
-
 ggplot(diso8,aes(x=w,y=q)) +
   geom_jitter(color='tomato3',size=5,alpha=0.2) +
   theme_classic() +
   geom_smooth(method='lm',size=2,color='royalblue') +
   annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
   size=10,x=0.5,y=4,hjust=0,vjust=0,color='royalblue') +
-  ylab('diso8') +
+  ylab('diso8: Youth in gangs a problem in neighborhood') +
   xlab('Fear index') +
   theme(text=element_text(size=20))
 ```
 
 P-Values for variables that can have more than 2 values fear6f
 ```{r}
-lmp <- function (modelobject) {
-  if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
-    f <- summary(modelobject)$fstatistic
-    p <- pf(f[1],f[2],f[3],lower.tail=F)
-    attributes(p) <- NULL
-    return(p)
+bin_cor <- function(var2) {
+  # Determine the correlation between a variable var1 and a binary variable 
+  # var2. This uses a Fisher test conditioned on the values of var2, and will
+  # be applicable if var1 is continuous (i.e. one of our composite indices).
+  tmp <- data.frame(v1=all_pc1$norm,v2=my_data[,var2])
+  tmp$v2 <- tmp$v2 - min(tmp$v2,na.rm=TRUE) # convert to 0-1 scale
+  if (sum(tmp$v2==0,na.rm=TRUE) > 1 & sum(tmp$v2==1,na.rm=TRUE) > 1) {
+    tt <- t.test(tmp$v1[tmp$v2==0],tmp$v1[tmp$v2==1])
+    res=data.frame(var=var2,est=tt$estimate[2]-tt$estimate[1],pval=tt$p.value,
+                 stringsAsFactors=FALSE)
+  }
+  res
 }
-lm_data <- my_data[,c('fear6f','vic1exta','aoj11','aoj17','pese1','pese2',
+
+bin_vars <- c('vic40','vic41','vic43','vic44','vic45','vic1ext','vic1hogar',
+                       'vicbar1','vicbar3','vicbar4','vicbar7','a4','fear10')
+bin_p <- ldply(bin_vars,bin_cor)
+
+ord_cor <- function(var2) {
+  # Determine the correlation between two ordered variables, var1 and var2. 
+  # This uses linear regression, and will be applicable when we're dealing
+  # with ordered categorical variables or composite indices.
+  # As a matter of convention, use the composite index as var1 so that the
+  # output makes sense.
+  tmp <- data.frame(v1=all_pc1$norm,v2=my_data[,var2])
+  reg <- lm(v1 ~ v2,data=tmp)
+  p <- summary(reg)$coefficients[2,4]
+  res=data.frame(var=var2,est=summary(reg)$coefficients[2,1],pval=p,
+                 stringsAsFactors=FALSE)
+  res
+}
+
+ord_vars <- c('fear6f','vic1exta','aoj11','aoj17','pese1','pese2',
                       'diso7','diso8','diso10','diso14','diso16','diso17',
-                      'diso18','vicbar3')]
-p_vals <- sapply(lm_data, function(x) lmp(lm(x ~ all_pc1$norm)))
-#p-values for binary variables
+                      'diso18','vicbar1f')
+ord_p <- ldply(ord_vars,ord_cor)
+plotme <- rbind(bin_p,ord_p)
 
-log_data <- my_data[,c('vic40','vic41','vic43','vic1ext','vic1hogar',
-                       'vicbar1','vicbar3','vicbar4','vicbar7')]
-log_data <- log_data-1
-log_data$vic44 <- my_data[,'vic44']
-log_data$fear10 <- my_data[,'fear10']
-
-p_vals <- sapply(log_data, function(x) coef(summary(glm(x ~ all_pc1$norm,family=binomial(logit))))[2,4])
+plotme$log_p <- -log10(plotme$pval)
+m <- max(plotme$log_p[plotme$log_p < Inf])
+plotme$log_p[plotme$log_p > m] <- 1.1*m
+ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=var)) +
+  geom_point(size=20,alpha=0.2) +
+  geom_text(color='black') +
+  geom_segment(x=-log10(0.01),xend=-log10(0.01),
+               y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='red') +
+  annotate("text",x=-log10(0.01)+0.2,y=max(plotme$est),label='p=0.01',
+           color='red') +
+  scale_color_gradientn(colours=rainbow(4)) +
+  theme_classic() +
+  theme(legend.position='none') +
+  xlab('Significance (-log(p))') +
+  ylab('Influence on fear index')
 ```
 
 vic45 and a4 appear not to be highly significant; we might want to drop those.
