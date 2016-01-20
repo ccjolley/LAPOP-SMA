@@ -16,7 +16,8 @@ library(MASS)
 To systematically explore all possible correlations with our fear index, we first need to see which haven't been accounted for in one of our other composite indices.
 
 ```{r}
-n_fear_more <- c(fear_common,'vic40','vic41','vic43','vic45','fear6f')
+n_fear_more <- c(fear_common,'vic40','vic41','vic43','vic45','fear6f','fear6e',
+                 'elsdiso18','elsdiso19','vicbar7f')
 n_ca_common <- c('cp5','cp7','cp8','cp13','cp20')
 n_ca_more <- c(n_ca_common,'honcp22','honcp21a','cp21')
 n_pv_gtm <- c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f',
@@ -177,30 +178,35 @@ a$aut_idx <- aut_all
 idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx')
 ```
 
-Next, we'll use the functions defined above to get all of our correlations. We'll keep those with p-values below the cutoff of `r 1/ncol(a)`
-
-```{r}
-cor_all_bin <- ldply(bin_common, function(x) bin_cor(a,'fear_idx',x))
-cor_all_ord <- ldply(ord_common, function(x) ord_cor(a,'fear_idx',x))
-cor_all_idx <- ldply(idxs, function(x) ord_cor(a,'fear_idx',x))
-cor_all_unord <- ldply(unord_common, function(x) unord_cor(a,'fear_idx',x))
-cor_all <- rbind(cor_all_bin,cor_all_ord,cor_all_unord,cor_all_idx)
-cor_all <- cor_all[order(cor_all$pval),]
-```
+Next, we'll use the functions defined above to get all of our correlations. We'll keep those with p-values below the cutoff of `r 1/ncol(a)`.
 
 While we have a list of which values of unordered categorical variables are significantly correlated with the fear index, the variables aren't formatted in a way that will be useful for multiple regression. We'll do this by creating dummy variables, with the same names as the `var` column in `cor_all`. (For example, `ocup1a_4` for `ocup1a == 4`.)
 
 ```{r}
-unord_vars <- ldply(cor_all_unord$var, function(x)
-  data.frame(var=strsplit(x,'_')[[1]][1],
-             val=as.numeric(strsplit(x,'_')[[1]][2]),
-             str=x,
-             stringsAsFactors=FALSE))
-for (i in 1:nrow(unord_vars)) {
-  a[,unord_vars$str[i]] <- as.numeric(a[,unord_vars$var[i]] == unord_vars$val[i])
+cor_data <- function(d,bin_vars,ord_vars,idx_vars,unord_vars) {
+  # takes a data frame d with all of the variabels that are to be correlated
+  # with the fear index, and returns a new data frame with all of the 
+  # high-correlation variables, including dummy variables
+  cor_bin <- ldply(bin_vars, function(x) bin_cor(d,'fear_idx',x))
+  cor_ord <- ldply(ord_vars, function(x) ord_cor(d,'fear_idx',x))
+  cor_idx <- ldply(idx_vars, function(x) ord_cor(d,'fear_idx',x))
+  cor_unord <- ldply(unord_vars, function(x) unord_cor(d,'fear_idx',x))
+  cor_all <- rbind(cor_bin,cor_ord,cor_unord,cor_idx)
+  cor_all <- cor_all[order(cor_all$pval),]
+  unord_vars <- ldply(cor_unord$var, function(x)
+    data.frame(var=strsplit(x,'_')[[1]][1],
+               val=as.numeric(strsplit(x,'_')[[1]][2]),
+               str=x,
+               stringsAsFactors=FALSE))
+  for (i in 1:nrow(unord_vars)) {
+    d[,unord_vars$str[i]] <- as.numeric(d[,unord_vars$var[i]] == unord_vars$val[i])
+  }
+  res <- d[,cor_all$var]
+  res$fear_idx <- d$fear_idx  
+  res
 }
-a2 <- a[,cor_all$var]
-a2$fear_idx <- a$fear_idx
+
+a2 <- cor_data(a,bin_common,ord_common,idxs,unord_common)
 ```
 
 One thing that can cause trouble in multiple regression is missing values -- we can only include rows in our dataframe that have a non-NA value for all of the variables compared. This means that as we add in more and more variables, we throw out more and more data, and our final results can be biased. We'll get around this by using multiple imputation. We'll need to create a predictor matrix (named `pm`) to account for the fact that we don't want to be using our fear index to impute values of the other variables -- this would be sort of circular logic!
@@ -214,59 +220,65 @@ b <- mice(a2,printFlag=F,predictorMatrix=pm)
 We can get to a decent set of variables using stepwise regression. What we'll do is run backward stepwise regression on each imputed dataset and keep only the ones that appear for all five sets. One can get pretty much the exact same result using forward regression (I checked).
 
 ```{r}
-b1 <- complete(b,1)
-b2 <- complete(b,2)
-b3 <- complete(b,3)
-b4 <- complete(b,4)
-b5 <- complete(b,5)
-lm1 <- lm(fear_idx ~ .,data=na.omit(b1))
-lm2 <- lm(fear_idx ~ .,data=na.omit(b2))
-lm3 <- lm(fear_idx ~ .,data=na.omit(b3))
-lm4 <- lm(fear_idx ~ .,data=na.omit(b4))
-lm5 <- lm(fear_idx ~ .,data=na.omit(b5))
-library(MASS)
-step1 <- stepAIC(lm1,trace=F) # final AIC = -967.9723
-step2 <- stepAIC(lm2,trace=F) # final AIC = -946.0618
-step3 <- stepAIC(lm3,trace=F) # final AIC = -951.4168
-step4 <- stepAIC(lm4,trace=F) # final AIC = -951.9888
-step5 <- stepAIC(lm5,trace=F) # final AIC = -941.9365
-counts <- as.data.frame(table(c(names(coef(step1)),names(coef(step2)),
-                                names(coef(step3)),names(coef(step4)),
-                                names(coef(step5)))),stringsAsFactors=F)
-counts[counts$Freq==5,'Var1']
-nrow(counts[counts$Freq==5,]) / nrow(counts) # 55% appear in all 5
+get_vars <- function(x) {
+  # gets variables that appear consistently in stepwise regression
+  # x should be an object returned by MICE
+  lm1 <- lm(fear_idx ~ .,data=na.omit(complete(x,1)))
+  lm2 <- lm(fear_idx ~ .,data=na.omit(complete(x,2)))
+  lm3 <- lm(fear_idx ~ .,data=na.omit(complete(x,3)))
+  lm4 <- lm(fear_idx ~ .,data=na.omit(complete(x,4)))
+  lm5 <- lm(fear_idx ~ .,data=na.omit(complete(x,5)))
+  step1 <- stepAIC(lm1,trace=F) 
+  step2 <- stepAIC(lm2,trace=F) 
+  step3 <- stepAIC(lm3,trace=F) 
+  step4 <- stepAIC(lm4,trace=F)
+  step5 <- stepAIC(lm5,trace=F) 
+  counts <- as.data.frame(table(c(names(coef(step1)),names(coef(step2)),
+                                  names(coef(step3)),names(coef(step4)),
+                                  names(coef(step5)))),stringsAsFactors=F)
+  counts[counts$Freq==5,'Var1']
+}
+
+get_vars(b)
 
 b.reg2 <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + 
-                               clien1n + d6 + ed2 + for1n_7 + for4_4 + 
+                               clien1n + d6 + ed2 + eff2 + for1n_7 + for4_4 + 
                                for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
-                               pol1 + pole2n + q3c_5 + sd3new2 + tr_idx + 
+                               pol1 + pole2n + q3c_12 + q3c_5 + sd3new2 + tr_idx + 
                                ur + vb20_4 + w14a + www1))
-s <- summary(pool(b.reg2))
-plotme <- data.frame(s[-1,c(1,5)])
-plotme$log_p <- -log10(plotme[,2])
-m <- max(plotme$log_p[plotme$log_p < Inf])
-plotme$log_p[plotme$log_p > m] <- 1.1*m
-scale <- c(1,1,1,1,1,10,8,1,1,1,4,4,4,1,4,4,1,4,1,1,1,1,5)
-plotme$est <- plotme$est * scale
-n = 0.02 # nudge factor
-nx = c(0,0,0,0,0,0,10*n,-5*n,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-ny = c(0,n,0,0,0,-n,2*n,n,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=rownames(plotme))) +
-  geom_point(size=20,alpha=0.2) +
-  geom_text(color='black',aes(x=log_p+nx, y=est+ny)) +
-  geom_segment(x=-log10(0.01),xend=-log10(0.01),
-               y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='red') +
-  annotate("text",x=-log10(0.01)+0.2,y=max(plotme$est),label='p=0.01',
-           color='red') +
-  geom_segment(x=-log10(0.05),xend=-log10(0.05),
-               y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='blue') +
-  annotate("text",x=-log10(0.05)-0.2,y=max(plotme$est),label='p=0.05',
-           color='blue') +
-  scale_color_gradientn(colours=rainbow(4)) +
-  theme_classic() +
-  theme(legend.position='none') +
-  xlab('Significance (-log(p))') +
-  ylab('Influence on fear index')
+
+lm_plot <- function(x,orig) {
+  # x must be the output from a multiple regression on MICE output
+  # orig must be the original, unimputed dataset
+  s <- summary(pool(x))
+  plotme <- data.frame(s[-1,c(1,5)])
+  plotme$log_p <- -log10(plotme[,2])
+  m <- max(plotme$log_p[plotme$log_p < Inf])
+  plotme$log_p[plotme$log_p > m] <- 1.1*m
+  scale <- sapply(rownames(plotme),
+                  function(x) max(orig[,x],na.rm=TRUE) - min(orig[,x],na.rm=TRUE))
+  scale[scale %% 1 > 0] <- 1 # don't rescale composite indices
+  plotme$est <- plotme$est * scale
+  plotme$label <- rownames(plotme)
+  ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=label)) +
+    geom_point(size=20,alpha=0.2) +
+    geom_text(color='black') +
+    geom_segment(x=-log10(0.01),xend=-log10(0.01),
+                 y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='red') +
+    annotate("text",x=-log10(0.01)+0.2,y=max(plotme$est),label='p=0.01',
+             color='red') +
+    geom_segment(x=-log10(0.05),xend=-log10(0.05),
+                 y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='blue') +
+    annotate("text",x=-log10(0.05)-0.2,y=max(plotme$est),label='p=0.05',
+             color='blue') +
+    scale_color_gradientn(colours=rainbow(4)) +
+    theme_classic() +
+    theme(legend.position='none') +
+    xlab('Significance (-log(p))') +
+    ylab('Influence on fear index')
+}
+
+lm_plot(b.reg2,a2)
 ```
 
 Variable  |Description                                    |Effect
@@ -275,23 +287,24 @@ Variable  |Description                                    |Effect
 `ur`      |Urbanization                                   |Urban = more fear  
 `tr_idx`  |Trust in government                            |Less trust = more fear
 `ca_idx`  |Community activity                             |More involvement = more fear
-`aut_idx` |Authoritarianism                               |More authoritarian = more fear
 `q3c = 5` |Evangelical/Protestant                         |More fearful
+`aut_idx` |Authoritarianism                               |More authoritarian = more fear
 `pole2n`  |Satisfaction with police performance           |Less satisfied = more fearful
-`for6`    |Influence of China in country                  |More influence = more fear
 `pol1`    |Interest in politics                           |More interest = more fear
+`for6`    |Influence of China in country                  |More influence = more fear
+`aoj22=1` |Reduce crime via preventative measures         |Less fearful
 `a4 = 5`  |Believes crime is the most serious problem     |More fearful
 `mil10c`  |Trustworthiness of Iranian government          |More trustworthy = more fear
-`aoj22=1` |Reduce crime via preventative measures         |Less fearful
 `clien1n` |Knows someone offered benefit for vote         |Yes = more fear
 `ocup4a=3`|Actively looking for a job                     |More fearful
+`q3c = 12`|Jehovah's Witnesses                            |More fearful
 `www1`    |Internet usage                                 |Frequent = more fear
 `w14a`    |Abortion justified when mother's health at risk|Yes = more fear
 `sd3new2` |Satisfaction with public schools               |Dissatisfaction = more fear
 `ed2`     |Education level of mother                      |More educated = more fear
 `vb20 = 4`|Plans to leave ballot blank in next election   |More fearful
 `d6`      |Approval of same-sex marriage                  |Approving = more fear 
-`for5 = 6`|Best model for future development is Russia    |More fearful
+`for1n=7` |Most influential country is Mexico             |More fearful
 
 ```{r}
 geo <- c('pais','estratopri','estratosec','prov','municipio')
@@ -301,19 +314,19 @@ my_geo$fear <- fear_all
 muni_avg <- ddply(my_geo,~muni_uniq,summarize,x=mean(fear))
 my_geo$muni_avg <- muni_avg$x[match(my_geo$muni_uniq,muni_avg$muni_uniq)]
 
-b.reggeo <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx +
-                                 clien1n + d6 + ed2 + for1n_7 + for4_4 + 
+b.reggeo <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + 
+                               clien1n + d6 + ed2 + eff2 + for1n_7 + for4_4 + 
                                for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
-                               pol1 + pole2n + q3c_5 + sd3new2 + tr_idx + 
+                               pol1 + pole2n + q3c_12 + q3c_5 + sd3new2 + tr_idx + 
                                ur + vb20_4 + w14a + www1 + my_geo$muni_avg))
 s_geo <- summary(pool(b.reggeo))
-plotme$geo_est <- s_geo[c(-1,-25),1]
-plotme$geo_logp <- -log10(s_geo[c(-1,-25),5])
+plotme$geo_est <- s_geo[c(-1,-27),1]
+plotme$geo_logp <- -log10(s_geo[c(-1,-27),5])
 m <- max(plotme$geo_logp[plotme$geo_logp < Inf])
 plotme$geo_logp[plotme$geo_logp > m] <- 1.1*m
 plotme$geo_est <- plotme$geo_est * scale
-nx = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5*n,0,0,0,0,0,0)
-ny = c(0,0,0,0,0,2*n,2.5*n,0,0,0,-n,0,0,0,0,0,0,0,0,0,-1.5*n,-2*n,0)
+nx = rep(0,nrow(plotme))
+ny = rep(0,nrow(plotme))
 ggplot(data=plotme,aes(x=geo_logp,y=geo_est,color=geo_est,
                        label=rownames(plotme))) +
   geom_point(size=20,alpha=0.2) +
@@ -334,9 +347,15 @@ ggplot(data=plotme,aes(x=geo_logp,y=geo_est,color=geo_est,
   theme(legend.position='none') +
   xlab('Significance (-log(p))') +
   ylab('Influence on fear index')
+#TODO: Factor this out into a function as well
+
 ```
 
-When we include the municipality averages in our multiple correlation, we're asking about the factors that make a person more fearful than others in their community. The straight lines attached to each circle illustrate how much they moved from the previous plot -- for example, `tr_idx` became dramatically less significant while `mil10c` hardly moved at all. This suggests that people's trust in their own government (`tr_idx`) correlates strongly with their municipality, while views on the Iranian government (`mil10c`) serve more to differentiate people within the same community. In general, most variables have a smaller estimated influence, but most significant variables remain significant -- some actually even increase. This means that we're measuring more than just attributes of places; these variables are telling us about people within heterogeneous places.
+When we include the municipality averages in our multiple correlation, we're asking about the factors that make a person more fearful than others in their community. The straight lines attached to each circle illustrate how much they moved from the previous plot -- for example, `tr_idx` became dramatically less significant while `mil10c` hardly moved at all. This suggests that people's trust in their own government (`tr_idx`) correlates strongly with their municipality, while views on the Iranian government (`mil10c`) serve more to differentiate people within the same community and actually become more significant. In general, most variables have a smaller estimated influence, but most significant variables remain significant -- some actually even increase. This means that we're measuring more than just attributes of places; these variables are telling us about people within heterogeneous places.
+
+The following variables lost enough significance when we included municipality-level fear averages that they are no longer significant at the p=0.05 level: `d6`, `ed2`, `for1n=7`, `sd3new2`, `vb20=4`, and `w14a`.
+
+In addition, `for6` and `q3c = 12` were previously significant at the p=0.01 level and are now only significant at the p=0.05 level.
 
 # Guatemala #
 
@@ -354,29 +373,13 @@ g$aut_idx <- aut_all[lapop.2014.all$pais==2]
 g$pv_idx <- pv_gtm
 idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx','pv_idx')
 
-cor_gtm_bin <- ldply(c(bin_common,bin_gtm), function(x) bin_cor(g,'fear_idx',x))
-cor_gtm_ord <- ldply(c(ord_common,ord_gtm), function(x) ord_cor(g,'fear_idx',x))
-cor_gtm_idx <- ldply(idxs, function(x) ord_cor(g,'fear_idx',x))
-cor_gtm_unord <- ldply(c(unord_common,unord_gtm), function(x) 
-  unord_cor(g,'fear_idx',x))
-cor_gtm <- rbind(cor_gtm_bin,cor_gtm_ord,cor_gtm_unord,cor_gtm_idx)
-cor_gtm <- cor_gtm[order(cor_gtm$pval),]
+g2 <- cor_data(g,c(bin_common,bin_gtm),c(ord_common,ord_gtm),idxs,
+               c(unord_common,unord_gtm))
 ```
 
 We definitely see a few variables that weren't on the menu before; some of these we might want to add into the indices we have.
 
 ```{r}
-unord_vars_g <- ldply(cor_gtm_unord$var, function(x)
-  data.frame(var=strsplit(x,'_')[[1]][1],
-             val=as.numeric(strsplit(x,'_')[[1]][2]),
-             str=x,
-             stringsAsFactors=FALSE))
-for (i in 1:nrow(unord_vars_g)) {
-  g[,unord_vars_g$str[i]] <- as.numeric(g[,unord_vars_g$var[i]] == unord_vars_g$val[i])
-}
-g2 <- g[,cor_gtm$var]
-g2$fear_idx <- g$fear_idx
-
 pm_g <- 1 - diag(ncol(g2))
 pm_g[,which(names(g2)=='fear_idx')] <- 0
 g_imp <- mice(g2,printFlag=F,predictorMatrix=pm_g)
@@ -385,55 +388,52 @@ g_imp <- mice(g2,printFlag=F,predictorMatrix=pm_g)
 Let's cut right to the chase and use stepwise regression on our multiply-imputed data:
 
 ```{r}
-lm1g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,1)))
-lm2g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,2)))
-lm3g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,3)))
-lm4g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,4)))
-lm5g <- lm(fear_idx ~ .,data=na.omit(complete(g_imp,5)))
-step1g <- stepAIC(lm1g,direction="both",trace=F) # final AIC = -1016.8753
-step2g <- stepAIC(lm2g,direction="both",trace=F) # final AIC = -997.2276
-step3g <- stepAIC(lm3g,direction="both",trace=F) # final AIC = -1014.1022
-step4g <- stepAIC(lm4g,direction="both",trace=F) # final AIC = -1005.7721
-step5g <- stepAIC(lm5g,direction="both",trace=F) # final AIC = -993.3492
-counts_g <- as.data.frame(table(c(names(coef(step1g)),names(coef(step2g)),
-                                names(coef(step3g)),names(coef(step4g)),
-                                names(coef(step5g)))),stringsAsFactors=F)
-counts_g[counts_g$Freq==5,'Var1']
-nrow(counts[counts_g$Freq==5,]) / nrow(counts_g) # 55% appear in all 5
+get_vars(g_imp)
 
 g.reg <- with(data=g_imp,exp=lm(fear_idx ~ a4_27 + a4_5 + aoj21_1 + aoj21_2 + 
-                                  aoj21_8 + aut_idx + d6 + fear6e + for4_1 + 
-                                  guaetid2n_1 + guaetid2n_16 + it1 + leng4_1 + 
-                                  per9 + pn4 + pole2n + pv_idx + pv3 + q3c_2 + 
-                                  tr_idx + ur + vb20_3 + vb20_4 + w_idx))
-summary(g.reg)
+                                  aoj21_6 + aoj21_7 + aoj21_8 + aut_idx + 
+                                  crit_idx + d6 + dvw1 + etid_2 + guaetid2n_1 + 
+                                  it1 + leng4_1 + leng4_2 + mil10a + per9 + 
+                                  pn4 + pol1 + pole2n + pr3a + pv_idx + pv3 + 
+                                  q3c_2 + tr_idx + ur + vb20_4 + vic52n + w_idx))
+
+lm_plot(g.reg,g2)
 ```
 
-TODO: Add scatter plot visualization for GTM.
+Variable         |Description                                  |Effect
+-----------------|---------------------------------------------|------------------------
+`ur`             |Urbanizaton                                  |Urban = more fearful
+`aoj21 = 8`     |Biggest threat = none of the above           |Less fearful
+`aoj21 = 2`     |Gangs are biggest threat to security         |More fearful
+`leng4 = 1`     |Parents only speak Spanish (not indigenous)  |More fearful
+`it1`            |Interpersonal trust                          |Less trust = more fear
+`pv_idx`         |Political violence index                     |More violence = more fear
+`a4 = 5`        |Crime the biggest problem                    |More fearful
+`tr_idx`         |Trust in government index                    |Less trust = more fear
+`vb20 = 4`      |Plans to vote but leave ballot blank         |More fear
+`aut_idx`        |Authoritarianism index                       |More authoritarian = more fear
+`pv3`            |Believes violence was used in 2015 elections |More belief = more fear
+`dvw1`           |Husband can hit wife if she neglects chores  |Less approving = more fear
+`pr3a`           |Pirating DVDs results in punishment?         |Yes = more fear
+`aoj21 = 7`      |Biggest threat to security = other           |More fearful
+`vb20 = 3`       |Plans to vote against current admin.         |Less fearful
+`mil10a`         |Trustworthiness of Chinese government        |Less trust = more fear
+`guaetid2n == 1` |Ethnic group = Achí                          |Less fearful
+`d6`             |Approval of same-sex marriage                |More approving = more fear
+`q3c = 2`        |Mainline Protestant (not Evangelical)        |Less fearful
+`crit_idx`       |Sympathy with gov critics                    |More sympathy = more fear
+`aoj21 = 6`      |Biggest threat to security = common criminals|More fearful
+`pn4`            |Satisfaction with democracy                  |More dissatisfied = more fear
+`w_idx`          |Wealth index                                 |More wealth = less fear
 
-So what are the strongest correlates in Guatemala?
+We can generalize to a few trends:
+- Ethnicity: Spanish-speaking Ladinos seem to be more fearful than people with indigenous languages and identities.
+- People with more "liberal" attitudes about same-sex marriage and spousal abuse are more fearful.
+- At the same time, people with more authoritarian political attitudes and less satisfaction with democracy are more fearful. Is this a contradiction?
+- People who see strong US influence are more fearful, but so are people who see strong Chinese influence. Is this a contradiction?
+- People who consider themselves emotionally stable are actually *more* fearful. What's going on here?
 
-- `fear6e`: Insecurity on public transportation (add to index?)
-- `aoj21 == 2`: Gangs are biggest threat to security
-- `ur`: Urbanizaton
-- `aoj21 == 8`: Biggest threat = none of the above (much less fearful)
-- `it1`: Interpersonal trust
-- `aut_idx`: Authoritarianism index
-- `pv_idx`: Political violence index
-- `leng4 == 1`: Parents' language (Spanish vs. indigenous)
-- `aoj21 == 8`: Biggest threat = your neighbors (less fearful)
-- `tr_idx`: Trust in government index
-- `vb20 == 4`: Plans to vote but leave ballot blank
-- `a4 == 5`: Crime the biggest problem
-- `guaetid2n == 16`: Ethnic group = Q'eqchi'
-- `a4 == 27`: Most serious problem = lack of security
-- `pv3`: Believes violence was used in 2015 elections
-- `d6`: Approval of same-sex marriage (higher = more fear)
-- `pole2n`: Satisfaction with police performance
-- `guaetid2n == 1`: Ethnic group = Achí
-- `pn4`: Satisfaction with democracy
-
-We see some new themes, as well as some overlap with the region-wide trends.
+TODO: Same geographic analysis we saw at the regional level.
 
 # El Salvador #
 
@@ -448,39 +448,8 @@ s$crit_idx <- crit_all[lapop.2014.all$pais==3]
 s$aut_idx <- aut_all[lapop.2014.all$pais==3]
 idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx')
 
-cor_slv_bin <- ldply(c(bin_common,bin_slv), function(x) bin_cor(s,'fear_idx',x))
-cor_slv_ord <- ldply(c(ord_common,ord_slv), function(x) ord_cor(s,'fear_idx',x))
-cor_slv_idx <- ldply(idxs, function(x) ord_cor(s,'fear_idx',x))
-cor_slv_unord <- ldply(c(unord_common,unord_slv), function(x) 
-  unord_cor(s,'fear_idx',x))
-cor_slv <- rbind(cor_slv_bin,cor_slv_ord,cor_slv_unord,cor_slv_idx)
-cor_slv <- cor_slv[order(cor_slv$pval),]
-head(cor_slv,15)
-```
-
-TODO: elsdiso18 and elsdiso19 should probably be made part of the index for SLV, given their topics and incredibly low p-values. Rather than adding on to the end of fear.Rmd, rename it as fear_HND.Rmd and make a new copy for GTM.
-
-We see a lot of variables that should look familiar, plus some new ones:
-- elsvb55c: Uses newspaper as info source for voting decision (yes=more fearful)
-- elsvb55d: Uses internet...
-- elsvb55e: Uses facebook...
-- elsvb55i: Uses candidate forums
-- vicbar7f: # of occurrences of murders (TODO: should also be part of index)
-- info1: knows about Law of Access to Public Information (yes=more fear)
-
-A lot of these seem like measures for political engagement, with the more-engaged and better-informed people being more concerned about crime.
-
-```{r}
-unord_vars_s <- ldply(cor_slv_unord$var, function(x)
-  data.frame(var=strsplit(x,'_')[[1]][1],
-             val=as.numeric(strsplit(x,'_')[[1]][2]),
-             str=x,
-             stringsAsFactors=FALSE))
-for (i in 1:nrow(unord_vars_s)) {
-  s[,unord_vars_s$str[i]] <- as.numeric(s[,unord_vars_s$var[i]] == unord_vars_s$val[i])
-}
-s2 <- s[,cor_slv$var]
-s2$fear_idx <- s$fear_idx
+s2 <- cor_data(s,c(bin_common,bin_slv),c(ord_common,ord_slv),idxs,
+               c(unord_common,unord_slv))
 
 pm_s <- 1 - diag(ncol(s2))
 pm_s[,which(names(s2)=='fear_idx')] <- 0
@@ -490,33 +459,39 @@ s_imp <- mice(s2,printFlag=F,predictorMatrix=pm_s)
 Let's cut right to the chase and use stepwise regression on our multiply-imputed data:
 
 ```{r}
-lm1s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,1)))
-lm2s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,2)))
-lm3s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,3)))
-lm4s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,4)))
-lm5s <- lm(fear_idx ~ .,data=na.omit(complete(s_imp,5)))
-step1s <- stepAIC(lm1s,direction="both",trace=F) # final AIC = 
-step2s <- stepAIC(lm2s,direction="both",trace=F) # final AIC = 
-step3s <- stepAIC(lm3s,direction="both",trace=F) # final AIC = 
-step4s <- stepAIC(lm4s,direction="both",trace=F) # final AIC = 
-step5s <- stepAIC(lm5s,direction="both",trace=F) # final AIC = 
-counts_s <- as.data.frame(table(c(names(coef(step1s)),names(coef(step2s)),
-                                names(coef(step3s)),names(coef(step4s)),
-                                names(coef(step5s)))),stringsAsFactors=F)
-counts_s[counts_s$Freq==5,'Var1']
-nrow(counts_s[counts_s$Freq==5,]) / nrow(counts_s) # 55% appear in all 5
+get_vars(s_imp)
 
-s.reg <- with(data=s_imp,exp=lm(fear_idx ~ ca_idx + cpss1 + elsdiso18 + elsdiso19 + elsvb55a + elsvb55e + gi0 + infra2 + it1 + pol1 + q11n_6 + sexi + tr_idx))
-summary(s.reg)
+s.reg <- with(data=s_imp,exp=lm(fear_idx ~  aut_idx + ca_idx + clien1n + ed + 
+                                  ed2 + elsvb48_11 + elsvb55a + elsvb55c + 
+                                  env1_2 + info1 + infra2 + it1 + np1 + 
+                                  ocup4a_1 + ocup4a_3 + pol1 + pole2n + pr1_3 + 
+                                  q10a + q11n_6 + q3c_5 + sd6new2 + sexi + 
+                                  tr_idx + ur))
+lm_plot(s.reg,s2)
 ```
 
-TODO: Add scatter plot visualization here also.
-
-In El Salvador, our most significant correlations (other than the elsdisos, which I need TODO something with) are:
-
-- `ca_idx`
-
-
+Variable         |Description                                     |Effect
+-----------------|------------------------------------------------|------------------------------
+`it1`            |Interpersonal trust                             |Less trust = more fear
+`ur`             |Urbanizaton                                     |Urban = more fearful
+`sexi`           |Interviewer sex                                 |Female = more fearful
+`pole2n`         |Satisfaction with police performance            |Dissatisfied = more fearful
+`elsvb55c`       |Uses newspaper as info source for voting        |Yes = more fearful
+`sd6new2`        |Satisfaction with public health services        |Dissatisfied = more fearful
+`pol1`           |Interest in politics                            |More interest = more fear
+`pr1 = 3`        |Borrowed or shared home (not owned/rented)      |More fearful
+`q3c = 5`        |Evangelical/Protestant                          |More fearful
+`info1`          |Heard of the Law of Access to Public Information|Yes = more fearful
+`aut_idx`        |Authoritarianism index                          |More authoritarian = more fear
+`tr_idx`         |Trust in government index                       |Less trust = more fear
+`elsvb48 = 11`   |Didn't vote in 2012 legislative elections       |Less fearful
+`infra2`         |Fire department response time                   |Short = more fear
+`elsvb55a`       |Uses radio as info source for voting            |Yes = more fearful
+`q10a`           |Receives remittances                            |Yes = more fear
+`clien1n`        |Knows someone offered benefit for vote          |Yes = more fear
+`ed2`            |Mother's education level                        |Higher = more fear
+`ocup4a = 1`     |Employed                                        |More fearful
+`np1`            |Attended a municipal meeting                    |Yes = more fearful
 
 **Honduras**
 
@@ -531,73 +506,39 @@ h$crit_idx <- crit_hnd
 h$aut_idx <- aut_hnd
 idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx')
 
-cor_hnd_bin <- ldply(c(bin_common,bin_hnd), function(x) bin_cor(h,'fear_idx',x))
-cor_hnd_ord <- ldply(c(ord_common,ord_hnd), function(x) ord_cor(h,'fear_idx',x))
-cor_hnd_idx <- ldply(idxs, function(x) ord_cor(h,'fear_idx',x))
-cor_hnd_unord <- ldply(c(unord_common,unord_hnd), function(x) 
-  unord_cor(h,'fear_idx',x))
-cor_hnd <- rbind(cor_hnd_bin,cor_hnd_ord,cor_hnd_unord,cor_hnd_idx)
-cor_hnd <- cor_hnd[order(cor_hnd$pval),]
-```
-
-
-```{r}
-unord_vars_h <- ldply(cor_hnd_unord$var, function(x)
-  data.frame(var=strsplit(x,'_')[[1]][1],
-             val=as.numeric(strsplit(x,'_')[[1]][2]),
-             str=x,
-             stringsAsFactors=FALSE))
-for (i in 1:nrow(unord_vars_h)) {
-  h[,unord_vars_h$str[i]] <- as.numeric(h[,unord_vars_h$var[i]] == unord_vars_h$val[i])
-}
-h2 <- h[,cor_hnd$var]
-h2$fear_idx <- h$fear_idx
+h2 <- cor_data(h,c(bin_common,bin_hnd),c(ord_common,ord_hnd),idxs,
+               c(unord_common,unord_hnd))
 
 pm_h <- 1 - diag(ncol(h2))
 pm_h[,which(names(h2)=='fear_idx')] <- 0
 h_imp <- mice(h2,printFlag=F,predictorMatrix=pm_h)
+
+get_vars(h_imp)
+
+h.reg <- with(data=h_imp,exp=lm(fear_idx ~ aut_idx + b20 + clien1na + coer1 + 
+                                  ico2 + it1 + mil10c + ocup4a_3 + per4 + 
+                                  pole2n + pr3e + prot3 + sd3new2 + sexi + 
+                                  tr_idx + ur))
+
+lm_plot(h.reg,h2)
 ```
 
-Let's cut right to the chase and use stepwise regression on our multiply-imputed data:
+Variable         |Description                                     |Effect
+-----------------|------------------------------------------------|------------------------------
+`ur`             |Urbanizaton                                     |Urban = more fearful
+`ico2`           |National police patrols the neighborhood        |More patrols = more fear
+`it1`            |Interpersonal trust                             |Less trust = more fear
+`pole2n`         |Satisfaction with police performance            |Dissatisfied = more fearful
+`sexi`           |Interviewer sex                                 |Male = more fearful
+`mil10c`         |Trustworthiness of Iranian government           |More trustworthy = more fear
+`pr3e`           |Building/renovating necessitates bribe          |More likely = more fear
+`aut_idx`        |Authoritarianism index                          |More authoritarian = more fear
+`tr_idx`         |Trust in government index                       |Less trust = more fear
+`coer1`          |Receive receipts from neighborhood stores       |More often = more fear
+`sd3new2`        |Satisfaction with public schools                |Dissatisfaction = more fear
+`clien1na`       |Offered benefit for vote                        |Yes = more fear
+`ocup4a=3`       |Actively looking for a job                      |More fearful
+`per4`           |Anxious personality                             |Yes = more fear
+`prot3`          |Participated in a protest                       |Yes = more fear
+`b20`            |Trust in Catholic Church                        |Less trust = more fear
 
-```{r}
-lm1h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,1)))
-lm2h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,2)))
-lm3h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,3)))
-lm4h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,4)))
-lm5h <- lm(fear_idx ~ .,data=na.omit(complete(h_imp,5)))
-step1h <- stepAIC(lm1h,direction="both",trace=F) # final AIC = 
-step2h <- stepAIC(lm2h,direction="both",trace=F) # final AIC = 
-step3h <- stepAIC(lm3h,direction="both",trace=F) # final AIC = 
-step4h <- stepAIC(lm4h,direction="both",trace=F) # final AIC = 
-step5h <- stepAIC(lm5h,direction="both",trace=F) # final AIC = 
-counts_h <- as.data.frame(table(c(names(coef(step1h)),names(coef(step2h)),
-                                names(coef(step3h)),names(coef(step4h)),
-                                names(coef(step5h)))),stringsAsFactors=F)
-counts_h[counts_h$Freq==5,'Var1']
-nrow(counts_h[counts_h$Freq==5,]) / nrow(counts_h) # 67% appear in all 5
-
-h.reg <- with(data=h_imp,exp=lm(fear_idx ~ a4_22 + aut_idx + b20 + clien1na + coer1 + gix4 + ico2 + it1 + mil10c + ocup4a_3 + per4 + pole2n + pr3e + prot3 + sd3new2 + tr_idx + ur))
-h_s <- summary(h.reg)
-```
-
-Now let's visualize the same way we did with the regional correlations.
-
-```{r}
-plotme_h <- data.frame(h_s[-1,c(1,5)])
-plotme_h$log_p <- -log10(plotme_h[,2])
-m <- max(plotme_h$log_p[plotme_h$log_p < Inf])
-plotme_h$log_p[plotme_h$log_p > m] <- 1.1*m
-# TODO: these numbers aren't right anymore; check for the real ones
-scale <- c(1,1,1,1,1,10,8,1,1,1,4,4,4,1,4,4,1,4,1,1,1,1,5)
-plotme_h$est <- plotme_h$est * scale
-# TODO: Add title to plot (all of them)
-ggplot(data=plotme_h,aes(x=log_p,y=est,color=est,label=rownames(plotme_h))) +
-  geom_point(size=20,alpha=0.2) +
-  geom_text(color='black') +
-  scale_color_gradientn(colours=rainbow(4)) +
-  theme_classic() +
-  theme(legend.position='none') +
-  xlab('Significance (-log(p))') +
-  ylab('Influence on fear index')
-```
