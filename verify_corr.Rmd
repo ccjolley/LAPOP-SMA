@@ -242,12 +242,12 @@ get_vars <- function(x) {
 get_vars(b)
 
 b.reg2 <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + 
-                               clien1n + d6 + ed2 + eff2 + for1n_7 + for4_4 + 
+                               clien1n + d6 + ed2 + for1n_7 + for4_4 + 
                                for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
-                               pol1 + pole2n + q3c_12 + q3c_5 + sd3new2 + tr_idx + 
+                               pol1 + pole2n + q3c_5 + sd3new2 + tr_idx + 
                                ur + vb20_4 + w14a + www1))
 
-lm_plot <- function(x,orig) {
+lm_plot <- function(x,orig,title) {
   # x must be the output from a multiple regression on MICE output
   # orig must be the original, unimputed dataset
   s <- summary(pool(x))
@@ -273,12 +273,16 @@ lm_plot <- function(x,orig) {
              color='blue') +
     scale_color_gradientn(colours=rainbow(4)) +
     theme_classic() +
-    theme(legend.position='none') +
+    theme(legend.position='none',
+          text=element_text(size=20)) +
     xlab('Significance (-log(p))') +
-    ylab('Influence on fear index')
+    ylab('Influence on fear index') +
+    ggtitle(title)
 }
 
-lm_plot(b.reg2,a2)
+lm_plot(b.reg2,a2,'Region-wide')
+# tmp <- summary(pool(b.reg2))
+# tmp[order(tmp[,5]),c(1,5)]
 ```
 
 Variable  |Description                                    |Effect
@@ -287,17 +291,16 @@ Variable  |Description                                    |Effect
 `ur`      |Urbanization                                   |Urban = more fear  
 `tr_idx`  |Trust in government                            |Less trust = more fear
 `ca_idx`  |Community activity                             |More involvement = more fear
-`q3c = 5` |Evangelical/Protestant                         |More fearful
 `aut_idx` |Authoritarianism                               |More authoritarian = more fear
+`q3c = 5` |Evangelical/Protestant                         |More fearful
 `pole2n`  |Satisfaction with police performance           |Less satisfied = more fearful
-`pol1`    |Interest in politics                           |More interest = more fear
 `for6`    |Influence of China in country                  |More influence = more fear
-`aoj22=1` |Reduce crime via preventative measures         |Less fearful
+`pol1`    |Interest in politics                           |More interest = more fear
 `a4 = 5`  |Believes crime is the most serious problem     |More fearful
 `mil10c`  |Trustworthiness of Iranian government          |More trustworthy = more fear
+`aoj22=1` |Reduce crime via preventative measures         |Less fearful
 `clien1n` |Knows someone offered benefit for vote         |Yes = more fear
 `ocup4a=3`|Actively looking for a job                     |More fearful
-`q3c = 12`|Jehovah's Witnesses                            |More fearful
 `www1`    |Internet usage                                 |Frequent = more fear
 `w14a`    |Abortion justified when mother's health at risk|Yes = more fear
 `sd3new2` |Satisfaction with public schools               |Dissatisfaction = more fear
@@ -392,13 +395,15 @@ Let's cut right to the chase and use stepwise regression on our multiply-imputed
 get_vars(g_imp)
 
 g.reg <- with(data=g_imp,exp=lm(fear_idx ~ a4_27 + a4_5 + aoj21_1 + aoj21_2 + 
-                                  aoj21_6 + aoj21_7 + aoj21_8 + aut_idx + 
-                                  crit_idx + d6 + dvw1 + etid_2 + guaetid2n_1 + 
-                                  it1 + leng4_1 + leng4_2 + mil10a + per9 + 
-                                  pn4 + pol1 + pole2n + pr3a + pv_idx + pv3 + 
-                                  q3c_2 + tr_idx + ur + vb20_4 + vic52n + w_idx))
+                                  aoj21_7 + aoj21_8 + aut_idx + 
+                                  crit_idx + d6 + dvw1 + for4_1 + guaetid2n_1 + guaetid2n_16 +
+                                  it1 + leng4_1 + leng4_2 + per9 + 
+                                  pn4 + pole2n + pr3a + pv_idx + pv3 + 
+                                  q3c_2 + sd3new2 + tr_idx + ur + vb20_4 + vic52n + w_idx))
 
-lm_plot(g.reg,g2)
+lm_plot(g.reg,g2,'Guatemala')
+tmp <- summary(pool(g.reg))
+tmp[order(tmp[,5]),c(1,5)]
 ```
 
 Variable         |Description                                  |Effect
@@ -409,23 +414,29 @@ Variable         |Description                                  |Effect
 `leng4 = 1`      |Parents only speak Spanish (not indigenous)  |More fearful
 `it1`            |Interpersonal trust                          |Less trust = more fear
 `pv_idx`         |Political violence index                     |More violence = more fear
+`dvw1`           |Husband can hit wife if she neglects chores  |Less approving = more fear
+`aut_idx`        |Authoritarianism index                       |More authoritarian = more fear
 `a4 = 5`         |Crime the biggest problem                    |More fearful
 `tr_idx`         |Trust in government index                    |Less trust = more fear
+
+`pv3`            |Believes violence will be used in 2015 elections |More belief = more fear
 `vb20 = 4`       |Plans to vote but leave ballot blank         |More fear
-`aut_idx`        |Authoritarianism index                       |More authoritarian = more fear
-`pv3`            |Believes violence was used in 2015 elections |More belief = more fear
-`dvw1`           |Husband can hit wife if she neglects chores  |Less approving = more fear
 `pr3a`           |Pirating DVDs results in punishment?         |Yes = more fear
-`aoj21 = 7`      |Biggest threat to security = other           |More fearful
-`vb20 = 3`       |Plans to vote against current admin.         |Less fearful
-`mil10a`         |Trustworthiness of Chinese government        |Less trust = more fear
+`pole2n`         |Satisfaction with police perfomance          |Dissatisfied = more fearful
+`guaetid2n=16`   |Ethnic group = Q'eqchi                       |Less fearful
 `guaetid2n == 1` |Ethnic group = Achí                          |Less fearful
+`leng4 = 2`      |Parents speak Spanish and indigenous language|More fearful
+`per9`           |Emotionally stable personality               |More fearful
+`for4 = 1`       |China will have most influence in 10 years   |More fearful
 `d6`             |Approval of same-sex marriage                |More approving = more fear
-`q3c = 2`        |Mainline Protestant (not Evangelical)        |Less fearful
-`crit_idx`       |Sympathy with gov critics                    |More sympathy = more fear
-`aoj21 = 6`      |Biggest threat to security = common criminals|More fearful
-`pn4`            |Satisfaction with democracy                  |More dissatisfied = more fear
 `w_idx`          |Wealth index                                 |More wealth = less fear
+`a4 = 27`        |Most serious problem = lack of security      |More fearful
+`q3c = 2`        |Mainline Protestant (not Evangelical)        |Less fearful
+`aoj21 = 7`      |Biggest threat to security = other           |More fearful
+`crit_idx`       |Sympathy with gov critics                    |More sympathy = more fear
+`aoj21 = 1`      |Biggest threat to security = my neighbors    |Less fearful
+
+
 
 We can generalize to a few trends:
 - Ethnicity: Spanish-speaking Ladinos seem to be more fearful than people with indigenous languages and identities.
@@ -462,13 +473,15 @@ Let's cut right to the chase and use stepwise regression on our multiply-imputed
 ```{r}
 get_vars(s_imp)
 
-s.reg <- with(data=s_imp,exp=lm(fear_idx ~  aut_idx + ca_idx + clien1n + ed + 
-                                  ed2 + elsvb48_11 + elsvb55a + elsvb55c + 
-                                  env1_2 + info1 + infra2 + it1 + np1 + 
-                                  ocup4a_1 + ocup4a_3 + pol1 + pole2n + pr1_3 + 
-                                  q10a + q11n_6 + q3c_5 + sd6new2 + sexi + 
+s.reg <- with(data=s_imp,exp=lm(fear_idx ~  aut_idx + ca_idx + clien1n + cpss1 + ed + 
+                                  ed2 + elsvb48_11 + elsvb55a + elsvb55c + elsvb55g + 
+                                  env1_2 + for5_10 + info1 + infra2 + it1 + np1 + 
+                                  pn4 + pol1 + pole2n + pr1_3 + 
+                                  q11n_6 + q3c_5 + sd6new2 + sexi + 
                                   tr_idx + ur))
-lm_plot(s.reg,s2)
+lm_plot(s.reg,s2,'El Salvador')
+ tmp <- summary(pool(s.reg))
+ tmp[order(tmp[,5]),c(1,5)]
 ```
 
 Variable         |Description                                     |Effect
@@ -479,20 +492,19 @@ Variable         |Description                                     |Effect
 `pole2n`         |Satisfaction with police performance            |Dissatisfied = more fearful
 `elsvb55c`       |Uses newspaper as info source for voting        |Yes = more fearful
 `sd6new2`        |Satisfaction with public health services        |Dissatisfied = more fearful
-`pol1`           |Interest in politics                            |More interest = more fear
+`elsvb48 = 11`   |Didn't vote in 2012 legislative elections       |Less fearful
+`tr_idx`         |Trust in government index                       |Less trust = more fear
 `pr1 = 3`        |Borrowed or shared home (not owned/rented)      |More fearful
 `q3c = 5`        |Evangelical/Protestant                          |More fearful
-`info1`          |Heard of the Law of Access to Public Information|Yes = more fearful
+`pol1`           |Interest in politics                            |More interest = more fear
 `aut_idx`        |Authoritarianism index                          |More authoritarian = more fear
-`tr_idx`         |Trust in government index                       |Less trust = more fear
-`elsvb48 = 11`   |Didn't vote in 2012 legislative elections       |Less fearful
+`info1`          |Heard of the Law of Access to Public Information|Yes = more fearful
 `infra2`         |Fire department response time                   |Short = more fear
-`elsvb55a`       |Uses radio as info source for voting            |Yes = more fearful
-`q10a`           |Receives remittances                            |Yes = more fear
-`clien1n`        |Knows someone offered benefit for vote          |Yes = more fear
+`env1_2`         |Promote economic growth instead of environment  |Less fearful
 `ed2`            |Mother's education level                        |Higher = more fear
-`ocup4a = 1`     |Employed                                        |More fearful
-`np1`            |Attended a municipal meeting                    |Yes = more fearful
+`elsvb55a`       |Uses radio as info source for voting            |Yes = more fearful
+`elsvb55g`       |Uses friends/relatives as info source for voting|Yes = more fearful
+`cpss1`          |Played a sport                                  |Yes = more fearful
 
 **Honduras**
 
@@ -516,12 +528,14 @@ h_imp <- mice(h2,printFlag=F,predictorMatrix=pm_h)
 
 get_vars(h_imp)
 
-h.reg <- with(data=h_imp,exp=lm(fear_idx ~ aut_idx + b20 + clien1na + coer1 + 
+h.reg <- with(data=h_imp,exp=lm(fear_idx ~ a4_22 + aut_idx + b20 + clien1na + coer1 + 
                                   ico2 + it1 + mil10c + ocup4a_3 + per4 + 
-                                  pole2n + pr3e + prot3 + sd3new2 + sexi + 
+                                  pole2n + pr3e + prot3 + sd3new2 + q14 + 
                                   tr_idx + ur))
 
-lm_plot(h.reg,h2)
+lm_plot(h.reg,h2,'Honduras')
+tmp <- summary(pool(h.reg))
+tmp[order(tmp[,5]),c(1,5)]
 ```
 
 Variable         |Description                                     |Effect
@@ -530,17 +544,17 @@ Variable         |Description                                     |Effect
 `ico2`           |National police patrols the neighborhood        |More patrols = more fear
 `it1`            |Interpersonal trust                             |Less trust = more fear
 `pole2n`         |Satisfaction with police performance            |Dissatisfied = more fearful
-`sexi`           |Interviewer sex                                 |Male = more fearful
 `mil10c`         |Trustworthiness of Iranian government           |More trustworthy = more fear
 `pr3e`           |Building/renovating necessitates bribe          |More likely = more fear
 `aut_idx`        |Authoritarianism index                          |More authoritarian = more fear
+`sd3new2`        |Satisfaction with public schools                |Dissatisfaction = more fear
 `tr_idx`         |Trust in government index                       |Less trust = more fear
 `coer1`          |Receive receipts from neighborhood stores       |More often = more fear
-`sd3new2`        |Satisfaction with public schools                |Dissatisfaction = more fear
-`clien1na`       |Offered benefit for vote                        |Yes = more fear
-`ocup4a=3`       |Actively looking for a job                      |More fearful
-`per4`           |Anxious personality                             |Yes = more fear
 `prot3`          |Participated in a protest                       |Yes = more fear
+`ocup4a=3`       |Actively looking for a job                      |More fearful
+`a4_22`          |Most serious problem = lack of health services  |Less fearful
 `b20`            |Trust in Catholic Church                        |Less trust = more fear
+`q14`            |Intends to live or work abroad                  |Yes = more fear
+
 
 TODO: Check all 3 of my fear_XXX.Rmd files; make sure that the max and min values of the fear indices are *exactly* the same as what I see here, so that I'm comparing apples to apples.

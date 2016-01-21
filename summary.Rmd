@@ -13,8 +13,10 @@ library(ggplot2)
 library(lubridate)
 library(VennDiagram)
 library(RColorBrewer)
+source('make_trends.R')
 
 # Load data
+setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
 lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
@@ -106,6 +108,42 @@ draw.triple.venn(ncol(lapop.2014.GTM),ncol(lapop.2014.SLV),ncol(lapop.2014.GTM),
                  euler.d=TRUE,scaled=TRUE)
 
 # Questions with time series
+
+# Create test data.
+ts = data.frame(count=c(ncol(lapop.trends), ncol(lapop.2014.all)-ncol(lapop.trends)), 
+                category=c('trend','notrend'))
+
+# Add addition columns, needed for drawing with geom_rect.
+ts$fraction = ts$count / sum(ts$count)
+ts = ts[order(ts$fraction), ]
+ts$ymax = cumsum(ts$fraction)
+ts$ymin = c(0, head(ts$ymax, n=-1))
+ggplot(ts, aes(fill=category, ymax=ymax, ymin=ymin, xmax=4, xmin=2)) +
+     geom_rect() +
+     coord_polar(theta="y") +
+     xlim(c(0, 4)) +
+     annotate('text',x=4,y=0.25,
+              label='2004-2014 time series',size=10,hjust=0.85) +
+     annotate('text',x=4,y=0.82,
+              label='No time series',size=10,hjust=0.3) +
+     theme_classic() +
+     theme(legend.position='none',
+           axis.ticks=element_blank(),
+           axis.text=element_blank(),
+           axis.line=element_blank(),
+           axis.title=element_blank())
+
+
+p2 = ggplot(dat, aes(fill=category, ymax=ymax, ymin=ymin, xmax=4, xmin=3)) +
+     geom_rect(colour="grey30") +
+     coord_polar(theta="y") +
+     xlim(c(0, 4)) +
+     theme_bw() +
+     theme(panel.grid=element_blank()) +
+     theme(axis.text=element_blank()) +
+     theme(axis.ticks=element_blank()) +
+     labs(title="Customized ring plot")
+
 ```
 
 # Missing values #
