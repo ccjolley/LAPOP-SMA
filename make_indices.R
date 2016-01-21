@@ -14,12 +14,6 @@ lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.HND$vic1exta[lapop.2014.HND$vic1exta == 999999] <-  0
 lapop.2014.GTM$vic1exta[lapop.2014.GTM$vic1exta == 999999] <- 0
 lapop.2014.SLV$vic1exta[lapop.2014.SLV$vic1exta == 999999] <- 0
-# vicbar1f is similar; asks about the number of occurrences of burglaries
-lapop.2014.HND$vicbar1f[lapop.2014.HND$vicbar1f == 999999] <-  0
-lapop.2014.GTM$vicbar1f[lapop.2014.GTM$vicbar1f == 999999] <- 0
-lapop.2014.SLV$vicbar1f[lapop.2014.SLV$vicbar1f == 999999] <- 0
-# vicbar7f asks about the number of occurences of murders (SLV only)
-lapop.2014.SLV$vicbar7f[lapop.2014.SLV$vicbar7f == 999999] <- 0
 common <- Reduce(intersect,list(names(lapop.2014.GTM),names(lapop.2014.SLV),
                                 names(lapop.2014.HND)))
 lapop.2014.all <- rbind(lapop.2014.GTM[,common],lapop.2014.SLV[,common],

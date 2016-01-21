@@ -38,8 +38,6 @@ my_data <- lapop.2014.SLV[,c('fear10','vic1ext','vic1exta',
                              'vicbar3','vicbar4','vicbar7','vicbar7f',
                              'elsdiso18','elsdiso19')]
 my_data$vic1exta[my_data$vic1exta > 800000] <- 0
-my_data$vicbar7f[my_data$vicbar7f > 800000] <- 0
-my_data$vicbar1f[my_data$vicbar1f > 800000] <- 0
 is.na(my_data[my_data>800000]) <- TRUE
 is.na(my_data[my_data>800000]) <- TRUE
 

@@ -50,9 +50,7 @@ my_data <- lapop.2014.GTM[,c('vic40', 'vic41', 'vic44', 'vic43',
                              'vicbar3','vicbar4','vicbar7')]
 my_data$vic1exta[my_data$vic1exta > 800000] <- 0
 my_data$vicbar7f[my_data$vicbar7f > 800000] <- 0
-my_data$vicbar1f[my_data$vicbar1f > 800000] <- 0
 my_data$a4 <- as.numeric(lapop.2014.SLV$a4 %in% c(5,14,27,30,57))
-is.na(my_data[my_data>800000]) <- TRUE
 is.na(my_data[my_data>800000]) <- TRUE
 
 my_complete <- na.omit(my_data)
