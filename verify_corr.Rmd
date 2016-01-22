@@ -241,26 +241,25 @@ get_vars <- function(x) {
 
 get_vars(b)
 
-b.reg2 <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + 
-                               clien1n + d6 + ed2 + for1n_7 + for4_4 + 
-                               for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
-                               pol1 + pole2n + q3c_5 + sd3new2 + tr_idx + 
-                               ur + vb20_4 + w14a + www1))
+b_form <- 'fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + clien1n + d6 + ed2 + 
+           for1n_7 + for4_4 + for5_6 + for6 + it1 + mil10c + ocup4a_3 + pol1 + 
+           pole2n + q3c_5 + sd3new2 + tr_idx + ur + vb20_4 + w14a + www1'
+b.reg2 <- with(data=b,exp=lm(as.formula(b_form)))
 
 lm_plot <- function(x,orig,title) {
   # x must be the output from a multiple regression on MICE output
-  # orig must be the original, unimputed dataset
+  # orig must be the original, unimputed datasetas
   s <- summary(pool(x))
   plotme <- data.frame(s[-1,c(1,5)])
   plotme$log_p <- -log10(plotme[,2])
   m <- max(plotme$log_p[plotme$log_p < Inf])
   plotme$log_p[plotme$log_p > m] <- 1.1*m
-  scale <- sapply(rownames(plotme),
+  plotme$scale <- sapply(rownames(plotme),
                   function(x) max(orig[,x],na.rm=TRUE) - min(orig[,x],na.rm=TRUE))
-  scale[scale %% 1 > 0] <- 1 # don't rescale composite indices
-  plotme$est <- plotme$est * scale
+  plotme$scale[plotme$scale %% 1 > 0] <- 1 # don't rescale composite indices
+  plotme$est <- plotme$est * plotme$scale
   plotme$label <- rownames(plotme)
-  ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=label)) +
+  p <- ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=label)) +
     geom_point(size=20,alpha=0.2) +
     geom_text(color='black') +
     geom_segment(x=-log10(0.01),xend=-log10(0.01),
@@ -278,9 +277,11 @@ lm_plot <- function(x,orig,title) {
     xlab('Significance (-log(p))') +
     ylab('Influence on fear index') +
     ggtitle(title)
+  print(p)
+  plotme # return this so I can re-use it below
 }
 
-lm_plot(b.reg2,a2,'Region-wide')
+plotme_all <- lm_plot(b.reg2,a2,'Region-wide')
 # tmp <- summary(pool(b.reg2))
 # tmp[order(tmp[,5]),c(1,5)]
 ```
@@ -310,49 +311,48 @@ Variable  |Description                                    |Effect
 `for1n=7` |Most influential country is Mexico             |More fearful
 
 ```{r}
-geo <- c('pais','estratopri','estratosec','prov','municipio')
-my_geo <- lapop.2014.all[,geo]
+my_geo <- lapop.2014.all[,c('pais','municipio')]
 my_geo$muni_uniq <- 10000*my_geo$pais + my_geo$municipio
 my_geo$fear <- fear_all
 muni_avg <- ddply(my_geo,~muni_uniq,summarize,x=mean(fear))
 my_geo$muni_avg <- muni_avg$x[match(my_geo$muni_uniq,muni_avg$muni_uniq)]
 
-b.reggeo <- with(data=b,exp=lm(fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + 
-                               clien1n + d6 + ed2 + eff2 + for1n_7 + for4_4 + 
-                               for5_6 + for6 + it1 + mil10c + ocup4a_3 + 
-                               pol1 + pole2n + q3c_12 + q3c_5 + sd3new2 + tr_idx + 
-                               ur + vb20_4 + w14a + www1 + my_geo$muni_avg))
+lm_plot_geo <- function(x,plotme,title) {
+  s_geo <- summary(pool(x))
+  tmp <- plotme
+  tmp$geo_est <- s_geo[c(-1,-nrow(s_geo)),1]
+  tmp$geo_logp <- -log10(s_geo[c(-1,-nrow(s_geo)),5])
+  m <- max(tmp$geo_logp[tmp$geo_logp < Inf])
+  tmp$geo_logp[tmp$geo_logp > m] <- 1.1*m
+  tmp$geo_est <- tmp$geo_est * tmp$scale
+  tmp$varnames <- rownames(tmp)
+  ggplot(data=tmp,aes(x=geo_logp,y=geo_est,color=geo_est,
+                         label=varnames)) +
+    geom_point(size=20,alpha=0.2) +
+    geom_segment(aes(x=log_p ,y=est,
+                     xend=geo_logp, yend=geo_est,
+                     color=geo_est)) +
+    geom_text(color='black',aes(x=geo_logp, y=geo_est)) +
+    geom_segment(aes(x=-log10(0.01),xend=-log10(0.01),
+                  y=1.2*min(est),yend=0.95*max(est)),color='red') +
+    annotate("text",x=-log10(0.01)+0.2,y=max(tmp$est),label='p=0.01',
+             color='red') +
+    geom_segment(aes(x=-log10(0.05),xend=-log10(0.05),
+                  y=1.2*min(est),yend=0.95*max(est)),color='blue') +
+    annotate("text",x=-log10(0.05)-0.2,y=max(tmp$est),label='p=0.05',
+             color='blue') +
+    scale_color_gradientn(colours=rainbow(4)) +
+    theme_classic() +
+    theme(legend.position='none',
+          text=element_text(size=20)) +
+    ggtitle(title) +
+    xlab('Significance (-log(p))') +
+    ylab('Geography-independent influence on fear index')
+}
 
-s_geo <- summary(pool(b.reggeo))
-plotme$geo_est <- s_geo[c(-1,-27),1]
-plotme$geo_logp <- -log10(s_geo[c(-1,-27),5])
-m <- max(plotme$geo_logp[plotme$geo_logp < Inf])
-plotme$geo_logp[plotme$geo_logp > m] <- 1.1*m
-plotme$geo_est <- plotme$geo_est * scale
-nx = rep(0,nrow(plotme))
-ny = rep(0,nrow(plotme))
-ggplot(data=plotme,aes(x=geo_logp,y=geo_est,color=geo_est,
-                       label=rownames(plotme))) +
-  geom_point(size=20,alpha=0.2) +
-  geom_segment(aes(x=plotme$log_p,y=plotme$est,
-                   xend=plotme$geo_logp,yend=plotme$geo_est,
-                   color=geo_est)) +
-  geom_text(color='black',aes(x=geo_logp+nx, y=geo_est+ny)) +
-  geom_segment(x=-log10(0.01),xend=-log10(0.01),
-               y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='red') +
-  annotate("text",x=-log10(0.01)+0.2,y=max(plotme$est),label='p=0.01',
-           color='red') +
-  geom_segment(x=-log10(0.05),xend=-log10(0.05),
-               y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='blue') +
-  annotate("text",x=-log10(0.05)-0.2,y=max(plotme$est),label='p=0.05',
-           color='blue') +
-  scale_color_gradientn(colours=rainbow(4)) +
-  theme_classic() +
-  theme(legend.position='none') +
-  xlab('Significance (-log(p))') +
-  ylab('Influence on fear index')
-#TODO: Factor this out into a function as well -- might require moving a couple pieces of lm_plot() out into something else.
-
+b_form_geo <- paste(b_form,'+ my_geo$muni_avg')
+b.reggeo <- with(data=b,exp=lm(as.formula(b_form_geo)))
+lm_plot_geo(b.reggeo,plotme_all,"Region-wide")
 ```
 
 When we include the municipality averages in our multiple correlation, we're asking about the factors that make a person more fearful than others in their community. The straight lines attached to each circle illustrate how much they moved from the previous plot -- for example, `tr_idx` became dramatically less significant while `mil10c` hardly moved at all. This suggests that people's trust in their own government (`tr_idx`) correlates strongly with their municipality, while views on the Iranian government (`mil10c`) serve more to differentiate people within the same community and actually become more significant. In general, most variables have a smaller estimated influence, but most significant variables remain significant -- some actually even increase. This means that we're measuring more than just attributes of places; these variables are telling us about people within heterogeneous places.
@@ -394,16 +394,16 @@ Let's cut right to the chase and use stepwise regression on our multiply-imputed
 ```{r}
 get_vars(g_imp)
 
-g.reg <- with(data=g_imp,exp=lm(fear_idx ~ a4_27 + a4_5 + aoj21_1 + aoj21_2 + 
-                                  aoj21_7 + aoj21_8 + aut_idx + 
-                                  crit_idx + d6 + dvw1 + for4_1 + guaetid2n_1 + guaetid2n_16 +
-                                  it1 + leng4_1 + leng4_2 + per9 + 
-                                  pn4 + pole2n + pr3a + pv_idx + pv3 + 
-                                  q3c_2 + sd3new2 + tr_idx + ur + vb20_4 + vic52n + w_idx))
+g_form <- 'fear_idx ~ a4_27 + a4_5 + aoj21_1 + aoj21_2 + aoj21_7 + aoj21_8 + 
+           aut_idx + crit_idx + d6 + dvw1 + for4_1 + guaetid2n_1 + 
+           guaetid2n_16 + it1 + leng4_1 + leng4_2 + per9 + pn4 + pole2n + 
+           pr3a + pv_idx + pv3 + q3c_2 + sd3new2 + tr_idx + ur + vb20_4 + 
+           vic52n + w_idx'
+g.reg <- with(data=g_imp,exp=lm(as.formula(g_form)))
+plotme_g <- lm_plot(g.reg,g2,'Guatemala')
 
-lm_plot(g.reg,g2,'Guatemala')
-tmp <- summary(pool(g.reg))
-tmp[order(tmp[,5]),c(1,5)]
+# tmp <- summary(pool(g.reg))
+# tmp[order(tmp[,5]),c(1,5)]
 ```
 
 Variable         |Description                                  |Effect
@@ -445,7 +445,15 @@ We can generalize to a few trends:
 - People who see strong US influence are more fearful, but so are people who see strong Chinese influence. Is this a contradiction?
 - People who consider themselves emotionally stable are actually *more* fearful. What's going on here?
 
-TODO: Same geographic analysis we saw at the regional level.
+```{r}
+my_geo_g <- data.frame(muni=lapop.2014.GTM$municipio,fear=fear_gtm)
+muni_avg_g <- ddply(my_geo_g,~muni,summarize,x=mean(fear))
+my_geo_g$muni_avg <- muni_avg_g$x[match(my_geo_g$muni,muni_avg_g$muni)]
+
+g_form_geo <- paste(g_form,'+ my_geo_g$muni_avg')
+g.reggeo <- with(data=g_imp,exp=lm(as.formula(g_form_geo)))
+lm_plot_geo(g.reggeo,plotme_g,"Guatemala")
+```
 
 # El Salvador #
 
@@ -473,15 +481,14 @@ Let's cut right to the chase and use stepwise regression on our multiply-imputed
 ```{r}
 get_vars(s_imp)
 
-s.reg <- with(data=s_imp,exp=lm(fear_idx ~  aut_idx + ca_idx + clien1n + cpss1 + ed + 
-                                  ed2 + elsvb48_11 + elsvb55a + elsvb55c + elsvb55g + 
-                                  env1_2 + for5_10 + info1 + infra2 + it1 + np1 + 
-                                  pn4 + pol1 + pole2n + pr1_3 + 
-                                  q11n_6 + q3c_5 + sd6new2 + sexi + 
-                                  tr_idx + ur))
-lm_plot(s.reg,s2,'El Salvador')
- tmp <- summary(pool(s.reg))
- tmp[order(tmp[,5]),c(1,5)]
+s_form <- 'fear_idx ~ aut_idx + ca_idx + clien1n + cpss1 + ed + ed2 + 
+           elsvb48_11 + elsvb55a + elsvb55c + elsvb55g + env1_2 + for5_10 + 
+           info1 + infra2 + it1 + np1 + pn4 + pol1 + pole2n + pr1_3 + q11n_6 +
+           q3c_5 + sd6new2 + sexi + tr_idx + ur'
+s.reg <- with(data=s_imp,exp=lm(as.formula(s_form)))
+plotme_s <- lm_plot(s.reg,s2,'El Salvador')
+#  tmp <- summary(pool(s.reg))
+#  tmp[order(tmp[,5]),c(1,5)]
 ```
 
 Variable         |Description                                     |Effect
@@ -506,6 +513,17 @@ Variable         |Description                                     |Effect
 `elsvb55g`       |Uses friends/relatives as info source for voting|Yes = more fearful
 `cpss1`          |Played a sport                                  |Yes = more fearful
 
+```{r}
+my_geo_s <- data.frame(muni=lapop.2014.SLV$municipio,fear=fear_slv)
+muni_avg_s <- ddply(my_geo_s,~muni,summarize,x=mean(fear))
+my_geo_s$muni_avg <- muni_avg_s$x[match(my_geo_s$muni,muni_avg_s$muni)]
+
+s_form_geo <- paste(s_form,'+ my_geo_s$muni_avg')
+s.reggeo <- with(data=s_imp,exp=lm(as.formula(s_form_geo)))
+lm_plot_geo(s.reggeo,plotme_s,"El Salvador")
+```
+
+
 **Honduras**
 
 ```{r}
@@ -528,14 +546,14 @@ h_imp <- mice(h2,printFlag=F,predictorMatrix=pm_h)
 
 get_vars(h_imp)
 
-h.reg <- with(data=h_imp,exp=lm(fear_idx ~ a4_22 + aut_idx + b20 + clien1na + coer1 + 
-                                  ico2 + it1 + mil10c + ocup4a_3 + per4 + 
-                                  pole2n + pr3e + prot3 + sd3new2 + q14 + 
-                                  tr_idx + ur))
+h_form <- 'fear_idx ~ a4_22 + aut_idx + b20 + clien1na + coer1 + ico2 + it1 + 
+           mil10c + ocup4a_3 + per4 + pole2n + pr3e + prot3 + sd3new2 + q14 + 
+           tr_idx + ur'
+h.reg <- with(data=h_imp,exp=lm(as.formula(h_form)))
 
-lm_plot(h.reg,h2,'Honduras')
-tmp <- summary(pool(h.reg))
-tmp[order(tmp[,5]),c(1,5)]
+plotme_h <- lm_plot(h.reg,h2,'Honduras')
+# tmp <- summary(pool(h.reg))
+# tmp[order(tmp[,5]),c(1,5)]
 ```
 
 Variable         |Description                                     |Effect
@@ -555,6 +573,16 @@ Variable         |Description                                     |Effect
 `a4_22`          |Most serious problem = lack of health services  |Less fearful
 `b20`            |Trust in Catholic Church                        |Less trust = more fear
 `q14`            |Intends to live or work abroad                  |Yes = more fear
+
+```{r}
+my_geo_h <- data.frame(muni=lapop.2014.HND$municipio,fear=fear_hnd)
+muni_avg_h <- ddply(my_geo_h,~muni,summarize,x=mean(fear))
+my_geo_h$muni_avg <- muni_avg_h$x[match(my_geo_h$muni,muni_avg_h$muni)]
+
+h_form_geo <- paste(h_form,'+ my_geo_h$muni_avg')
+h.reggeo <- with(data=h_imp,exp=lm(as.formula(h_form_geo)))
+lm_plot_geo(h.reggeo,plotme_h,"Honduras")
+```
 
 
 TODO: Check all 3 of my fear_XXX.Rmd files; make sure that the max and min values of the fear indices are *exactly* the same as what I see here, so that I'm comparing apples to apples.
