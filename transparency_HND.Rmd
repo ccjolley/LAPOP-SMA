@@ -1,0 +1,225 @@
+---
+title: "Honduras transparency index"
+author: "Craig Jolley"
+date: "January 27, 2016"
+output: html_document
+---
+
+```{r}
+lapop.2014.HND <- read.csv("../HND-2014.csv")
+```
+
+- honqt1: Transparency of the presidency of the republic (1 = very, 4 = not at all)
+- honqt2: Transparency of the National Congress
+- honqt3: Transparency of the Government Accountability Office
+- honqt4: Transparency of the state enterprises (ENEE, SANAA, HONDUTEL etc.)
+- honqt5: Transparency of the police
+- honqt6: Transparency of the Armed Forces
+- honqt7: Transparency of the Public Ministry
+- honqt8: Transparency of the National Anticorruption Council
+- honqt9: Transparency of the municipal government
+- honqt10: Transparency of the Superior Court of Accounts
+- honqt11: Transparency of the Institute for Access to Public Information
+- honqt12: Transparency of the Supreme Electoral Tribunal
+
+```{r,message=FALSE}
+library(ggplot2)
+library(mice)
+library(plyr)
+library(GGally)
+set.seed(12345)
+my_data <- lapop.2014.HND[,paste('honqt',1:12,sep='')]
+is.na(my_data[my_data>800000]) <- TRUE
+
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete, center = TRUE, scale = FALSE)
+# save this to plot later
+s <- summary(pr_complete)
+df <- data.frame(t(s$importance))
+names(df) <- c('stdev','proportion','cum')
+df$pc <- 1:nrow(df)
+```
+
+52% of total variance winds up in the first component.
+
+```{r}
+my_imp <- mice(my_data, printFlag = F)
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=factor(var,levels=rev(var)),y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
+```
+
+None of the variables have more than 20% missing; most everyone has an opinion about the police and fewer have one about the Institute for Access to Public Information.
+
+Now calculate PCA for each of the imputed datasets.
+
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+s1 <- summary(pr[[1]])
+df1 <- data.frame(t(s1$importance))
+names(df1) <- c('stdev','proportion','cum')
+df1$pc <- 1:nrow(df1)
+df1$group <- 'after'
+df$group <- 'before'
+df1 <- rbind(df,df1)
+ggplot(df1,aes(x=pc,y=cum,color=group)) +
+  geom_point(size=5) +
+  geom_line(size=2) +
+  scale_y_continuous(limits=c(0,1)) +
+  xlab('Principal component') +
+  ylab('Cumulative variance') +
+  annotate('text',x=2,y=df$cum[1],hjust=0,size=10,color='#2A3132',
+           label=paste(round(df$cum[1]*100),'% variance in PC1',sep='')) +
+  theme_classic() +
+  theme(legend.title=element_blank(),
+        axis.ticks=element_blank(),
+        text=element_text(size=20))
+```
+
+Imputation decreased the fraction of variance in the first component slightly to 52% -- still pretty good.
+
+```{r}
+PC1 <- pr[[1]]$x[,1]
+PC2 <- pr[[1]]$x[,2]
+qplot(PC1,PC2) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.text=element_blank(),
+        axis.line=element_blank(),
+        text=element_text(size=20))
+```
+
+PC1 is a little bit "stripy", but still shows a decent distribution.
+
+```{r}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
+ggpairs(all_pc1) + theme_classic()
+```
+
+```{r}
+all_pc1$avg <- rowMeans(all_pc1)
+qchange <- data.frame(low=colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE),
+                      hi=colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE))
+qchange$slope <- qchange$hi - qchange$low
+qchange$label <- rownames(qchange)
+qchange$even <- rank(qchange$hi)/nrow(qchange)*max(qchange$hi)
+ggplot(data=qchange) +
+  geom_segment(aes(x=0,y=qchange$low,xend=1,yend=qchange$hi,
+                   color=qchange$slope),size=1) +
+  scale_color_gradient(low='#FF420E',high='#89DA59') +
+  geom_text(aes(x=1,y=(qchange$even+qchange$hi)/2,label=qchange$label,
+                hjust=0,color=qchange$slope),size=5) +
+  annotate("text",x=0,y=1.5,label='Average in lowest quartile',hjust=0) +
+  annotate("text",x=1,y=1.5,label='Average in highest quartile',hjust=1) +
+  scale_x_continuous(limits=c(0,1.5)) +
+  scale_y_continuous(limits=c(1.5,3.8)) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title=element_blank(),
+        text=element_text(size=20))
+
+```
+
+All values increase (toward less transparency) as the index increases -- need to flip sign below. 
+
+```{r}
+all_pc1$norm <- scale(-all_pc1$avg) # sign flip -- now high values mean more fear
+predict_data <- data.frame(honqt1=c(4,1))
+for (i in 2:12) {
+  predict_data[,paste('honqt',i,sep='')] <- predict_data$honqt1
+}
+
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (mean(all_pc1$avg) - minmax) / sd(all_pc1$avg)
+quantile(all_pc1$norm)
+trans <- data.frame(w=all_pc1$norm) 
+```
+
+```{r}
+predict_data2 <- data.frame(diag(ncol(predict_data)))
+names(predict_data2) <- names(predict_data)
+predict_data2 <- 4 - predict_data2
+```
+
+Now, in each row of predict_data2, all values are those that will give a lower score, except for one.
+```{r}
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- (mean(all_pc1$avg)-scores)/sd(all_pc1$avg)
+```
+
+Now you can see that all of the scores are reasonably close to the minimum value stored in minmax.
+```{r}
+diff <- data.frame(d=(scores-minmax[1]), n = names(predict_data))
+ggplot(diff, aes(x=n,y=d)) + 
+  geom_bar(stat = 'identity', fill = 'skyblue') + 
+  coord_flip() + 
+  theme_classic() + 
+  theme(text = element_text(size=20), 
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank())
+```
+
+All variables have a nearly equal effect.
+
+```{r}
+honqt5 <- data.frame(q=my_data$honqt5,w=trans$w)
+my_lm <- lm(data=honqt5, q ~ w)
+ggplot(honqt5,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+  size=10,x=-1.5,y=1,hjust=0,vjust=0,color='royalblue') +
+  ylab('Transparency of police') +
+  xlab('Transparency index') +
+  theme(text=element_text(size=20))
+```
+
+```{r}
+honqt11 <- data.frame(q=my_data$honqt11,w=trans$w)
+my_lm <- lm(data=honqt11, q ~ w)
+ggplot(honqt11,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+  size=10,x=0.5,y=4,hjust=0,vjust=0,color='royalblue') +
+  ylab('Transparency of the IAPI') +
+  xlab('Transparency index') +
+  theme(text=element_text(size=20))
+
+```
+
+
+P-Values for variables that can have more than 2 values fear6f
+```{r}
+lmp <- function (modelobject) {
+  if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+    f <- summary(modelobject)$fstatistic
+    p <- pf(f[1],f[2],f[3],lower.tail=F)
+    attributes(p) <- NULL
+    return(p)
+}
+lm_data <- my_data[,c('vic1exta','aoj11','aoj17','pese1','pese2',
+                      'diso7','diso8','diso10','diso14','diso16','diso17',
+                      'diso18','elsdiso18','elsdiso19','vicbar7f','vicbar1f',
+                      'vicbar3')]
+sapply(my_data, function(x) lmp(lm(x ~ all_pc1$norm)))
+# All are very significant
+```
+
+All are highly significant. Can we map this?
