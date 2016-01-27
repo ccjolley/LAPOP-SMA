@@ -63,7 +63,7 @@ names(lapop.2014.SLV) <- tolower(names(lapop.2014.SLV))
 lapop.2004.GTM$year <- 2004; lapop.2004.HND$year <- 2004; lapop.2004.SLV$year <- 2004
 lapop.2006.GTM$year <- 2006; lapop.2006.HND$year <- 2006; lapop.2006.SLV$year <- 2006
 lapop.2008.GTM$year <- 2008; lapop.2008.HND$year <- 2008; lapop.2008.SLV$year <- 2008
-lapop.2010.GTM$year <- 2010; lapop.2010.HND$year <- 2010; lapop.2004.SLV$year <- 2010
+lapop.2010.GTM$year <- 2010; lapop.2010.HND$year <- 2010; lapop.2010.SLV$year <- 2010
 lapop.2012.GTM$year <- 2012; lapop.2012.HND$year <- 2012; lapop.2012.SLV$year <- 2012
 lapop.2014.GTM$year <- 2014; lapop.2014.HND$year <- 2014; lapop.2014.SLV$year <- 2014
 
@@ -117,3 +117,16 @@ rm(lapop.2004.GTM,lapop.2004.SLV,lapop.2004.HND,
    fnames,trend.all,yrs,intersection)
 
 setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
+
+#TODO: lapop.trends really needs lat/long information.
+# Looks like 'pais' is the only geo indicator that has the same name every year.
+# prov: HND,SLV from 2008 on, GTM from 2010
+# GTM 2004 uses gprov, 2006 uses guadept, guamunicipio, 2008 uses provincia
+# To make matters worse, I can't count on the same numeric codes being
+# used every year, and I only have codebooks for 2014.
+
+#lapop.2004.GTMf <- read.dta(fnames['2004','GTM'],convert.factors=TRUE)
+# if I load the STATA files with converted factors, some of them get converted into
+# text but the ones I care about the most don't (for whatever reason). I could try
+# doing this in STATA -- load, drop all columns but the geographic ones, and convert
+# those from factors to text...

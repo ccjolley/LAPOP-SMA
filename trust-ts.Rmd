@@ -33,19 +33,21 @@ ggplot(data=j,aes(x=tr,y=tr_ts)) +
   ylab('2004-2014 trust index')
 ```
 
-What is the time trend for the region-wide trust level?
+What is the time trend for the trust level?
 
 ```{r}
-df3 <- data.frame(year=lapop.trends$year,tr_idx=tr_ts_idx)
-plotme <- ddply(df3,'year',summarize,mean=mean(tr_idx),
+df3 <- data.frame(year=lapop.trends$year,pais=lapop.trends$pais,tr_idx=tr_ts_idx)
+plotme <- ddply(df3,.(year,pais),summarize,mean=mean(tr_idx),
       lo=t.test(tr_idx)$conf.int[1],hi=t.test(tr_idx)$conf.int[2])
-ggplot(plotme,aes(x=year,y=mean)) +
-  geom_point(size=3) +
-  geom_line() +
+pais_text <- c('','Guatemala','El Salvador','Honduras')
+plotme$pais <- pais_text[plotme$pais]
+ggplot(plotme,aes(x=year,y=mean,group=pais,color=pais)) +
+  geom_point(size=5) +
+  geom_line(size=3) +
   geom_errorbar(aes(ymin=lo,ymax=hi,width=0.5)) +
   ylab('Average trust index') +
   scale_x_continuous(limits=c(2004,2014)) +
   theme_classic()
 ```
 
-No systematic trend. I wonder how much of this has to do with election cycles in different countries. Might be interesting to make successive maps and see where things are changing (or not). This would require geocoding everything, which could be a bit of a challenge.
+It seems odd to me that trust in government spiked in Honduras in 2010, the year after a coup. Apparently people had high hopes for the Lobo administration.
