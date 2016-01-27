@@ -16,79 +16,7 @@ library(MASS)
 To systematically explore all possible correlations with our fear index, we first need to see which haven't been accounted for in one of our other composite indices.
 
 ```{r}
-n_fear_more <- c(fear_common,'vic40','vic41','vic43','vic45','fear6f','fear6e',
-                 'elsdiso18','elsdiso19','vicbar7f')
-n_ca_common <- c('cp5','cp7','cp8','cp13','cp20')
-n_ca_more <- c(n_ca_common,'honcp22','honcp21a','cp21')
-n_pv_gtm <- c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f',
-            'pv2g','pv2h','pv2i','pv2j','pv2k')
-n_ex_common <- c('exc2','exc6','exc20','exc11','exc13','exc14',
-               'exc15','exc16','exc7')
-n_tr_more <- c(tr_common,'pr4','m1','b11','esb48','epp1','epp3','pr4',
-             'epn3a','epn3b','epn3c','b11','b37','b14','b15','b19',
-             'b46','honb51','venb11','venhonb51',
-             'venhonvb10','epp1','epp3','aoj18')
-n_w_more <- c(w_common,'inf3a')
-n_aut_hnd <- c('dem2','dem11','aut1','jc13','jc10','jc15a',
-             'jc16a','honjc17')
-n_aut_common <- c('dem2','dem11','jc13','jc10','jc15a')
-n_geo_more <- c('pais','estratopri','estratosec','upm','prov','municipio',
-              'cluster','tamano','hondistrito')
-n_dont_use <- c('idnum','fecha','wt','uniq_id','nationality','vb3n','vb11',
-              'leng1')
-
-used <- unique(c(n_fear_more,n_ca_more,n_pv_gtm,n_ex_common,n_tr_more,
-                 n_w_more,crit_common,n_aut_hnd,n_geo_more,n_dont_use))
-
-unused_common <- names(lapop.2014.all)[!(names(lapop.2014.all) %in% used)]
-unused_gtm <- names(lapop.2014.GTM)[!(names(lapop.2014.GTM) %in% used) & 
-                                    !(names(lapop.2014.GTM) %in% unused_common)]
-unused_slv <- names(lapop.2014.SLV)[!(names(lapop.2014.SLV) %in% used) & 
-                                      !(names(lapop.2014.SLV) %in% unused_common)]
-unused_hnd <- names(lapop.2014.HND)[!(names(lapop.2014.HND) %in% used) & 
-                                      !(names(lapop.2014.HND) %in% unused_common)]
-# common questions with country-specific answers
-addback <- c('vb3n','vb11','leng1')
-unused_gtm <- c(unused_gtm,addback)
-unused_slv <- c(unused_slv,addback)
-unused_hnd <- c(unused_hnd,addback)
-```
-
-We now have a list of unused variables that are common to all three countries, as well as a list of the unique unused variables for each country. Next, we need to categorize these variables as binary, ordered, or unordered categorical.
-
-```{r}
-# Assume a function is binary if only two responses are present
-is_binary <- function(data,var) {
-  u <- unique(data[,var])
-  length(u[u<888888]) == 2
-}
-
-bin_common <- unused_common[sapply(unused_common,function(x) 
-  is_binary(lapop.2014.all,x))]
-bin_gtm <- unused_gtm[sapply(unused_gtm,function(x) 
-  is_binary(lapop.2014.GTM,x))]
-bin_slv <- unused_slv[sapply(unused_slv,function(x) 
-  is_binary(lapop.2014.SLV,x))]
-bin_hnd <- unused_hnd[sapply(unused_hnd,function(x) 
-  is_binary(lapop.2014.HND,x))]
-
-# Note that, while the indicators vb3n, vb11, and leng1 are used in all three
-# countries, the answers are country-specific and shouldn't be used as 
-# regional indicators.
-unord_common <- c('idiomaq','a4','vic2','vic2aa','aoj22','env1','vb1',
-                  'vb4new','vb101','vb20','for1n','for4',
-                  'for5','q3c','ocup4a','ocup1a','q11n','etid')
-ord_common <- unused_common[!(unused_common %in% bin_common) &
-                            !(unused_common %in% unord_common)]
-unord_gtm <- c('aoj21','chipart107n','parclien','guaetid2n','leng4','vb3n','vb11','leng1')
-ord_gtm <- unused_gtm[!(unused_gtm %in% bin_gtm) &
-                        !(unused_gtm %in% unord_gtm)]
-unord_slv <- c('esexc16a','elsvb48','pr1','vb3n','vb11','leng1')
-ord_slv <- unused_slv[!(unused_slv %in% bin_slv) &
-                        !(unused_slv %in% unord_slv)]
-unord_hnd <- c('dst1','vb3n','vb11','leng1')
-ord_hnd <- unused_hnd[!(unused_hnd %in% bin_hnd) &
-                              !(unused_hnd %in% unord_hnd)]
+source('classify_vars.R')
 ```
 
 The appopriate method for finding correlations will be different for each of these three types of variables. I've defined three functions that take the same inputs and produce similar outputs, so that all can be combined and compared at the end.
@@ -96,69 +24,6 @@ The appopriate method for finding correlations will be different for each of the
 Note that all of the functions below set the p-value cutoff, by default, to `1/ncol(data)` This is appropriate in cases (like this one) where we're looking at a large number of variables -- if we have more variables then we're more likely to observe spurious correlations so we need to be stricter. 
 
 ```{r}
-bin_cor <- function(data,var1,var2,cutoff=0) {
-  # Determine the correlation between a variable var1 and a binary variable 
-  # var2. This uses a Fisher test conditioned on the values of var2, and will
-  # be applicable if var1 is continuous (i.e. one of our composite indices).
-  res = data.frame(var=character(),est=numeric(),pval=numeric(),
-                   stringsAsFactors=FALSE)
-  if (var1 != var2) {
-    if (cutoff == 0) {
-      cutoff <- 1 / ncol(data)
-    }
-    tmp <- data.frame(v1=data[,var1],v2=data[,var2])
-    is.na(tmp[tmp>800000]) <- TRUE
-    tmp$v2 <- tmp$v2 - min(tmp$v2,na.rm=TRUE) # convert to 0-1 scale
-    if (sum(tmp$v2==0,na.rm=TRUE) > 1 & sum(tmp$v2==1,na.rm=TRUE) > 1) {
-      tt <- t.test(tmp$v1[tmp$v2==0],tmp$v1[tmp$v2==1])
-      if (tt$p.value < cutoff) {
-        res=data.frame(var=var2,est=tt$estimate[2]-tt$estimate[1],pval=tt$p.value,
-                       stringsAsFactors=FALSE)
-      }
-    }
-  }
-  res
-}
-
-ord_cor <- function(data,var1,var2,cutoff=0) {
-  # Determine the correlation between two ordered variables, var1 and var2. 
-  # This uses linear regression, and will be applicable when we're dealing
-  # with ordered categorical variables or composite indices.
-  # As a matter of convention, use the composite index as var1 so that the
-  # output makes sense.
-  res = data.frame(var=character(),est=numeric(),pval=numeric(),
-                   stringsAsFactors=FALSE)
-  if (var1 != var2) {
-    if (cutoff == 0) {
-      cutoff <- 1 / ncol(data)
-    }
-    tmp <- data.frame(v1=data[,var1],v2=data[,var2])
-    is.na(tmp[tmp>800000]) <- TRUE
-    reg <- lm(v1 ~ v2,data=tmp)
-    p <- summary(reg)$coefficients[2,4]
-    if (p < cutoff) {
-      res=data.frame(var=var2,est=summary(reg)$coefficients[2,1],pval=p,
-                     stringsAsFactors=FALSE)
-    }
-  }
-  res
-}
-
-unord_cor <- function(data,var1,var2,cutoff=0) {
-  # Determine the correlation between an ordered variable var1 and an unordered
-  # categorical variable var2. Do this by creating a binary variable for each
-  # possible value of var2 and calling bin_cor().
-  vals <- na.omit(unique(data[data[,var2] < 800000,var2]))
-  if (cutoff == 0) {
-    cutoff <- 1 / ncol(data)
-  }
-  tmp <- data.frame(v1=data[,var1])
-  is.na(tmp[tmp>800000]) <- TRUE
-  for (x in vals) {
-    tmp[,paste(var2,x,sep='_')] <- as.numeric(data[,var2] == x)
-  }
-  ldply(names(tmp),function(x) bin_cor(tmp,'v1',x,cutoff))
-}
 ```
 
 **Region-wide**
@@ -183,14 +48,17 @@ Next, we'll use the functions defined above to get all of our correlations. We'l
 While we have a list of which values of unordered categorical variables are significantly correlated with the fear index, the variables aren't formatted in a way that will be useful for multiple regression. We'll do this by creating dummy variables, with the same names as the `var` column in `cor_all`. (For example, `ocup1a_4` for `ocup1a == 4`.)
 
 ```{r}
+# TODO: pass 'fear_idx' in as an argument and move this out into another
+# source file so that I can re-use it elsewhere. Base off of the version in
+# west.R
 cor_data <- function(d,bin_vars,ord_vars,idx_vars,unord_vars) {
-  # takes a data frame d with all of the variabels that are to be correlated
+  # takes a data frame d with all of the variables that are to be correlated
   # with the fear index, and returns a new data frame with all of the 
   # high-correlation variables, including dummy variables
-  cor_bin <- ldply(bin_vars, function(x) bin_cor(d,'fear_idx',x))
-  cor_ord <- ldply(ord_vars, function(x) ord_cor(d,'fear_idx',x))
-  cor_idx <- ldply(idx_vars, function(x) ord_cor(d,'fear_idx',x))
-  cor_unord <- ldply(unord_vars, function(x) unord_cor(d,'fear_idx',x))
+  cor_bin <- ldply(bin_vars, function(x) ord_bin(d,'fear_idx',x))
+  cor_ord <- ldply(ord_vars, function(x) ord_ord(d,'fear_idx',x))
+  cor_idx <- ldply(idx_vars, function(x) ord_ord(d,'fear_idx',x))
+  cor_unord <- ldply(unord_vars, function(x) ord_unord(d,'fear_idx',x))
   cor_all <- rbind(cor_bin,cor_ord,cor_unord,cor_idx)
   cor_all <- cor_all[order(cor_all$pval),]
   unord_vars <- ldply(cor_unord$var, function(x)
@@ -220,6 +88,8 @@ b <- mice(a2,printFlag=F,predictorMatrix=pm)
 We can get to a decent set of variables using stepwise regression. What we'll do is run backward stepwise regression on each imputed dataset and keep only the ones that appear for all five sets. One can get pretty much the exact same result using forward regression (I checked).
 
 ```{r}
+# TODO: move this out into another file; use something like the version
+# in west.R
 get_vars <- function(x) {
   # gets variables that appear consistently in stepwise regression
   # x should be an object returned by MICE
@@ -294,7 +164,7 @@ Variable  |Description                                    |Effect
 `ca_idx`  |Community activity                             |More involvement = more fear
 `aut_idx` |Authoritarianism                               |More authoritarian = more fear
 `q3c = 5` |Evangelical/Protestant                         |More fearful
-`pole2n`  |Satisfaction with police performance           |Less satisfied = more fearful
+`pole2n`  |Satisfaction with police performance           |Less satisfied = more fearfu
 `for6`    |Influence of China in country                  |More influence = more fear
 `pol1`    |Interest in politics                           |More interest = more fear
 `a4 = 5`  |Believes crime is the most serious problem     |More fearful
