@@ -1,0 +1,51 @@
+---
+title: "Trust in government time series"
+author: "Craig Jolley"
+date: "January 27, 2016"
+output: html_document
+---
+
+I'm curious which of the variables in our trust in government index have historical information available, and how these vary over time.
+
+```{r}
+setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
+source('make_trends.R')
+source('make_indices.R')
+tr_common_ts <- intersect(names(lapop.trends),tr_common)
+tr_ts_idx <- make_idx(lapop.trends,tr_common_ts,sgn=-1)
+```
+
+The new index uses ```length(tr_common_ts)``` variables, rather than the previous ```length(tr_common)```, and is constructed using ```nrow(lapop.trends)``` observations rather than the previous ```nrow(lapop.2014.all)```. For the 2014 data (where both indices were calculated), how well do they agree?
+
+```{r}
+df1 <- data.frame(idnum=lapop.trends$idnum,tr_ts=tr_ts_idx)
+# idnum isn't actually in there -- need to fix this
+df2 <- data.frame(idnum=lapop.2014.all$idnum,tr=tr_all)
+j <- join(df2,df1,by='idnum')
+my_lm <- lm(data=j,tr_ts~tr)
+ggplot(data=j,aes(x=tr,y=tr_ts)) +
+  geom_point(color='tomato',alpha=0.3) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,3)),
+             size=10,x=-1.5,y=1,hjust=0,vjust=0,color='royalblue') +
+  xlab('2014 trust index') +
+  ylab('2004-2014 trust index')
+```
+
+What is the time trend for the region-wide trust level?
+
+```{r}
+df3 <- data.frame(year=lapop.trends$year,tr_idx=tr_ts_idx)
+plotme <- ddply(df3,'year',summarize,mean=mean(tr_idx),
+      lo=t.test(tr_idx)$conf.int[1],hi=t.test(tr_idx)$conf.int[2])
+ggplot(plotme,aes(x=year,y=mean)) +
+  geom_point(size=3) +
+  geom_line() +
+  geom_errorbar(aes(ymin=lo,ymax=hi,width=0.5)) +
+  ylab('Average trust index') +
+  scale_x_continuous(limits=c(2004,2014)) +
+  theme_classic()
+```
+
+No systematic trend. I wonder how much of this has to do with election cycles in different countries. Might be interesting to make successive maps and see where things are changing (or not). This would require geocoding everything, which could be a bit of a challenge.
