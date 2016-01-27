@@ -1,0 +1,53 @@
+---
+title: "Wealth time series"
+author: "Craig Jolley"
+date: "January 27, 2016"
+output: html_document
+---
+
+I'm curious which of the variables in our trust in government index have historical information available, and how these vary over time.
+
+```{r}
+setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
+source('make_trends.R')
+source('make_indices.R')
+w_common_ts <- intersect(names(lapop.trends),w_common)
+w_ts_idx <- make_idx(lapop.trends,w_common_ts,sgn=1)
+```
+
+The new index uses ```length(w_common_ts)``` variables, rather than the previous ```length(w_common)```, and is constructed using ```nrow(lapop.trends)``` observations rather than the previous ```nrow(lapop.2014.all)```. For the 2014 data (where both indices were calculated), how well do they agree?
+
+```{r}
+df1 <- data.frame(idnum=lapop.trends$idnum,w_ts=w_ts_idx)
+# idnum isn't actually in there -- need to fix this
+df2 <- data.frame(idnum=lapop.2014.all$idnum,w=w_all)
+j <- join(df2,df1,by='idnum')
+my_lm <- lm(data=j,w_ts~w)
+ggplot(data=j,aes(x=w,y=w_ts)) +
+  geom_point(color='tomato',alpha=0.3) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,3)),
+             size=10,x=-1.5,y=1,hjust=0,vjust=0,color='royalblue') +
+  xlab('2014 wealth index') +
+  ylab('2004-2014 wealth index')
+```
+
+The R-squared is decent, but not spectacular. The problem is that the 2014 index was very dependent on `q10new` and `q10g`, which are missing in the older datasets. Presumably, the new versions have been adjusted for inflation. This new wealth index, focusing solely on physical possessions, might do better at capturing a currency-independent standard of living.
+
+```{r}
+df3 <- data.frame(year=lapop.trends$year,pais=lapop.trends$pais,w_idx=w_ts_idx)
+plotme <- ddply(df3,.(year,pais),summarize,mean=mean(w_idx),
+      lo=t.test(w_idx)$conf.int[1],hi=t.test(w_idx)$conf.int[2])
+pais_text <- c('','Guatemala','El Salvador','Honduras')
+plotme$pais <- pais_text[plotme$pais]
+ggplot(plotme,aes(x=year,y=mean,group=pais,color=pais)) +
+  geom_point(size=5) +
+  geom_line(size=3) +
+  geom_errorbar(aes(ymin=lo,ymax=hi,width=0.5)) +
+  ylab('Average wealth index') +
+  scale_x_continuous(limits=c(2004,2014)) +
+  theme_classic()
+```
+
+On average things are getting better, most dramatically in Honduras. With better geocoding I can get a more detailed picture of where things are improving the most.
