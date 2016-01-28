@@ -148,7 +148,7 @@ ord_unord <- function(data,var1,var2,cutoff=0) {
   for (x in vals) {
     tmp[,paste(var2,x,sep='_')] <- as.numeric(data[,var2] == x)
   }
-  ldply(names(tmp),function(x) bin_cor(tmp,'v1',x,cutoff))
+  ldply(names(tmp),function(x) ord_bin(tmp,'v1',x,cutoff))
 }
 
 bin_bin <- function(data,var1,var2,cutoff=0) {
