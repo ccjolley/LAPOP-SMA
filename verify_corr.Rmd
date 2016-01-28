@@ -11,6 +11,7 @@ Rather than re-calculating all of the indices here, we've got the code to do thi
 source('make_indices.R')
 library(plyr)
 library(MASS)
+library(stringr)
 ```
 
 To systematically explore all possible correlations with our fear index, we first need to see which haven't been accounted for in one of our other composite indices.
@@ -61,7 +62,7 @@ cor_data <- function(d,bin_vars,ord_vars,idx_vars,unord_vars) {
   cor_unord <- ldply(unord_vars, function(x) ord_unord(d,'fear_idx',x))
   cor_all <- rbind(cor_bin,cor_ord,cor_unord,cor_idx)
   cor_all <- cor_all[order(cor_all$pval),]
-  unord_vars <- ldply(cor_unord$var, function(x)
+  unord_vars <- ldply(cor_unord$var2, function(x)
     data.frame(var=strsplit(x,'_')[[1]][1],
                val=as.numeric(strsplit(x,'_')[[1]][2]),
                str=x,
@@ -69,7 +70,7 @@ cor_data <- function(d,bin_vars,ord_vars,idx_vars,unord_vars) {
   for (i in 1:nrow(unord_vars)) {
     d[,unord_vars$str[i]] <- as.numeric(d[,unord_vars$var[i]] == unord_vars$val[i])
   }
-  res <- d[,cor_all$var]
+  res <- d[,cor_all$var2]
   res$fear_idx <- d$fear_idx  
   res
 }
@@ -116,9 +117,19 @@ b_form <- 'fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + clien1n + d6 + ed2 +
            pole2n + q3c_5 + sd3new2 + tr_idx + ur + vb20_4 + w14a + www1'
 b.reg2 <- with(data=b,exp=lm(as.formula(b_form)))
 
-lm_plot <- function(x,orig,title) {
+lm_plot <- function(x,orig,title,p_max=0.01,text=NULL,offsets=NULL,
+                    flip=NULL,width=15) {
   # x must be the output from a multiple regression on MICE output
   # orig must be the original, unimputed datasetas
+  # p_max is the maximum p-value that will be included in the viz
+  # text is a 2-column data frame containing variable names and
+  #   the text with which they should be replaced
+  # offsets is a 3-column data frame (var,x,y) detailing how 
+  #   labels should be offset for readability.
+  # flip is a list of variables whose directionality should be 
+  #       flipped for better comprehension                      
+  # width is the width (in characters) to be used for wrapping of long
+  #   labels
   s <- summary(pool(x))
   plotme <- data.frame(s[-1,c(1,5)])
   plotme$log_p <- -log10(plotme[,2])
@@ -129,29 +140,71 @@ lm_plot <- function(x,orig,title) {
   plotme$scale[plotme$scale %% 1 > 0] <- 1 # don't rescale composite indices
   plotme$est <- plotme$est * plotme$scale
   plotme$label <- rownames(plotme)
+  # get rid of non-significant points
+  plotme <- plotme[plotme$log_p > -log10(p_max),]
+  # flip as needed
+  if (!is.null(flip)) {
+    plotme[plotme$label %in% flip,'est'] <- -1*plotme[plotme$label %in% flip,'est']
+  }
+  # move labels if needed
+  plotme$label_x <- plotme$log_p
+  plotme$label_y <- plotme$est
+  if (!is.null(offsets)) {
+    j <- join(plotme,offsets,by='label')
+    plotme[!is.na(j$x),'label_x'] <- plotme[!is.na(j$x),'label_x'] + 
+      j[!is.na(j$x),'x']
+    plotme[!is.na(j$y),'label_y'] <- plotme[!is.na(j$y),'label_y'] + 
+      j[!is.na(j$y),'y']
+  }
+  # replace labels
+  if (!is.null(text)) {
+    j <- join(plotme,text,by='label')
+    plotme[!is.na(j$long),'label'] <- str_wrap(j[!is.na(j$long),'long'],width)
+  }
+  # now build the plot
   p <- ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=label)) +
     geom_point(size=20,alpha=0.2) +
-    geom_text(color='black') +
-    geom_segment(x=-log10(0.01),xend=-log10(0.01),
-                 y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='red') +
-    annotate("text",x=-log10(0.01)+0.2,y=max(plotme$est),label='p=0.01',
-             color='red') +
-    geom_segment(x=-log10(0.05),xend=-log10(0.05),
-                 y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='blue') +
-    annotate("text",x=-log10(0.05)-0.2,y=max(plotme$est),label='p=0.05',
-             color='blue') +
-    scale_color_gradientn(colours=rainbow(4)) +
+    geom_text(color='black',lineheight=0.8,aes(x=label_x,y=label_y)) +
+    scale_color_gradientn(colours=c('cornflowerblue','seashell3',
+                                    'firebrick1')) +
     theme_classic() +
     theme(legend.position='none',
           text=element_text(size=20)) +
-    xlab('Significance (-log(p))') +
+    xlab('Significance') +
     ylab('Influence on fear index') +
     ggtitle(title)
+  if (p_max > 0.01) {
+    p <- p + geom_segment(x=-log10(0.01),xend=-log10(0.01),
+                 y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='red') +
+    annotate("text",x=-log10(0.01)+0.2,y=max(plotme$est),label='p=0.01',
+             color='red') 
+  }
+  if (p_max > 0.05) {
+    p <- p + geom_segment(x=-log10(0.05),xend=-log10(0.05),
+                 y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='blue') +
+    annotate("text",x=-log10(0.05)-0.2,y=max(plotme$est),label='p=0.05',
+             color='blue') 
+  }
   print(p)
   plotme # return this so I can re-use it below
 }
-
-plotme_all <- lm_plot(b.reg2,a2,'Region-wide')
+replace_text <- data.frame(label=c('it1','ur','tr_idx','ca_idx','aut_idx',
+                                   'q3c_5','pole2n','for6','a4_5','ocup4a_3',
+                                   'mil10c','pol1','clien1n','aoj22_1'),
+                           long=c('Interpersonal trust','Urbanization',
+                                  'Trust in government','Community involvement',
+                                  'Authoritarianism','Evangelical',
+                                  'Dissatisfaction with police',
+                                  'Influence of China','Biggest problem: Crime',
+                                  'Unemployed','Trust in Iran',
+                                  'Interest in politics','Offered benefit for vote',
+                                  'Crime prevention over punishment'),
+                           stringsAsFactors=FALSE)
+label_offsets <- data.frame(label=c('it1','a4_5','for6','clien1n','pol1'),
+                            x=c(-0.4,0.7,0.2,0.1,0.3),y=c(0,-0.02,0.02,-0.02,0))
+flip_us <- c('it1','ur','for6','mil10c','pol1','clien1n')
+plotme_all <- lm_plot(b.reg2,a2,'Region-wide',p_max=0.01,text=replace_text,
+                      offsets=label_offsets,flip=flip_us,width=20)
 # tmp <- summary(pool(b.reg2))
 # tmp[order(tmp[,5]),c(1,5)]
 ```
@@ -164,7 +217,7 @@ Variable  |Description                                    |Effect
 `ca_idx`  |Community activity                             |More involvement = more fear
 `aut_idx` |Authoritarianism                               |More authoritarian = more fear
 `q3c = 5` |Evangelical/Protestant                         |More fearful
-`pole2n`  |Satisfaction with police performance           |Less satisfied = more fearfu
+`pole2n`  |Satisfaction with police performance           |Less satisfied = more fearful
 `for6`    |Influence of China in country                  |More influence = more fear
 `pol1`    |Interest in politics                           |More interest = more fear
 `a4 = 5`  |Believes crime is the most serious problem     |More fearful
