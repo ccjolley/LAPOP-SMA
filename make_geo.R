@@ -3,13 +3,13 @@
 library(ggmap)
 library(plyr)
 
-
-
 # No need to load these again, as long as this is called *after*
 # make_indices.R
-# lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
-# lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
-# lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
+if (!exists(c('lapop.2014.GTM','lapop.2014.SLV','lapop.2014.HND'))) {
+  lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
+  lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
+  lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
+}
 geo <- c('pais','estratopri','estratosec','prov','municipio')
 my_geo <- rbind(lapop.2014.GTM[,geo],lapop.2014.SLV[,geo],
                         lapop.2014.HND[,geo])
@@ -158,10 +158,14 @@ my_geo$lat <- joined$Latitude
 my_geo$long <- joined$Longitude
 rm(aldeas,ald2,geo2,joined)
 
-# Get locations in Guatemala and El Salvador from the Google API
+# Missed some:
+# unique(my_geo[my_geo$pais==4 & is.na(my_geo$lat),])
+
+# Get locations in Guatemala and El Salvador from the Google API, along with the ones 
+# I missed in Honduras.
 my_geo$locstr <- paste(my_geo$muni_text,my_geo$prov_text,my_geo$pais_text,
                        sep=", ")
-uniq_loc <- unique(my_geo[my_geo$pais<4,'locstr'])
+uniq_loc <- unique(my_geo[is.na(my_geo$lat),'locstr'])
 latlong <- ldply(uniq_loc,function(x) geocode(x,source="google",output="latlon"))
 latlong$locstr <- uniq_loc
 names(latlong) <- c('long2','lat2','locstr')
