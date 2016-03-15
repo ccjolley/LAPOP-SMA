@@ -100,7 +100,9 @@ ord_bin <- function(data,var1,var2,cutoff=0) {
     tmp <- data.frame(v1=data[,var1],v2=data[,var2])
     is.na(tmp[tmp>800000]) <- TRUE
     tmp$v2 <- tmp$v2 - min(tmp$v2,na.rm=TRUE) # convert to 0-1 scale
-    if (sum(tmp$v2==0,na.rm=TRUE) > 1 & sum(tmp$v2==1,na.rm=TRUE) > 1) {
+    #if (sum(tmp$v2==0,na.rm=TRUE) > 1 & sum(tmp$v2==1,na.rm=TRUE) > 1) {
+    if (sum(!is.na(tmp[tmp$v2==0,'v1'])) > 1 & 
+        sum(!is.na(tmp[tmp$v2==1,'v1'])) > 1) {
       tt <- t.test(tmp$v1[tmp$v2==0],tmp$v1[tmp$v2==1])
       if (tt$p.value < cutoff) {
         res=data.frame(var1=var1,var2=var2,est=tt$estimate[2]-tt$estimate[1],

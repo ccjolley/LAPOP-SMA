@@ -175,4 +175,4 @@ my_geo[is.na(my_geo$long),'long'] <- joined2[is.na(my_geo$long),'long2']
 rm(uniq_loc,latlong,joined2)
 
 # Clean up my_geo to contain only the useful columns
-my_geo <- my_geo[,7:12]
+my_geo <- my_geo[,c(2,7:12)]

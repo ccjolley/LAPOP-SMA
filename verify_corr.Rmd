@@ -8,6 +8,7 @@ output: html_document
 Rather than re-calculating all of the indices here, we've got the code to do this stashed in a separate R file.
 
 ``` {r}
+setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
 source('make_indices.R')
 library(plyr)
 library(MASS)
@@ -117,77 +118,7 @@ b_form <- 'fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + clien1n + d6 + ed2 +
            pole2n + q3c_5 + sd3new2 + tr_idx + ur + vb20_4 + w14a + www1'
 b.reg2 <- with(data=b,exp=lm(as.formula(b_form)))
 
-lm_plot <- function(x,orig,title,p_max=0.01,text=NULL,offsets=NULL,
-                    flip=NULL,width=15) {
-  # x must be the output from a multiple regression on MICE output
-  # orig must be the original, unimputed datasetas
-  # p_max is the maximum p-value that will be included in the viz
-  # text is a 2-column data frame containing variable names and
-  #   the text with which they should be replaced
-  # offsets is a 3-column data frame (var,x,y) detailing how 
-  #   labels should be offset for readability.
-  # flip is a list of variables whose directionality should be 
-  #       flipped for better comprehension                      
-  # width is the width (in characters) to be used for wrapping of long
-  #   labels
-  s <- summary(pool(x))
-  plotme <- data.frame(s[-1,c(1,5)])
-  plotme$log_p <- -log10(plotme[,2])
-  m <- max(plotme$log_p[plotme$log_p < Inf])
-  plotme$log_p[plotme$log_p > m] <- 1.1*m
-  plotme$scale <- sapply(rownames(plotme),
-                  function(x) max(orig[,x],na.rm=TRUE) - min(orig[,x],na.rm=TRUE))
-  plotme$scale[plotme$scale %% 1 > 0] <- 1 # don't rescale composite indices
-  plotme$est <- plotme$est * plotme$scale
-  plotme$label <- rownames(plotme)
-  # get rid of non-significant points
-  plotme <- plotme[plotme$log_p > -log10(p_max),]
-  # flip as needed
-  if (!is.null(flip)) {
-    plotme[plotme$label %in% flip,'est'] <- -1*plotme[plotme$label %in% flip,'est']
-  }
-  # move labels if needed
-  plotme$label_x <- plotme$log_p
-  plotme$label_y <- plotme$est
-  if (!is.null(offsets)) {
-    j <- join(plotme,offsets,by='label')
-    plotme[!is.na(j$x),'label_x'] <- plotme[!is.na(j$x),'label_x'] + 
-      j[!is.na(j$x),'x']
-    plotme[!is.na(j$y),'label_y'] <- plotme[!is.na(j$y),'label_y'] + 
-      j[!is.na(j$y),'y']
-  }
-  # replace labels
-  if (!is.null(text)) {
-    j <- join(plotme,text,by='label')
-    plotme[!is.na(j$long),'label'] <- str_wrap(j[!is.na(j$long),'long'],width)
-  }
-  # now build the plot
-  p <- ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=label)) +
-    geom_point(size=20,alpha=0.2) +
-    geom_text(color='black',lineheight=0.8,aes(x=label_x,y=label_y)) +
-    scale_color_gradientn(colours=c('cornflowerblue','seashell3',
-                                    'firebrick1')) +
-    theme_classic() +
-    theme(legend.position='none',
-          text=element_text(size=20)) +
-    xlab('Significance') +
-    ylab('Influence on fear index') +
-    ggtitle(title)
-  if (p_max > 0.01) {
-    p <- p + geom_segment(x=-log10(0.01),xend=-log10(0.01),
-                 y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='red') +
-    annotate("text",x=-log10(0.01)+0.2,y=max(plotme$est),label='p=0.01',
-             color='red') 
-  }
-  if (p_max > 0.05) {
-    p <- p + geom_segment(x=-log10(0.05),xend=-log10(0.05),
-                 y=1.2*min(plotme$est),yend=0.95*max(plotme$est),color='blue') +
-    annotate("text",x=-log10(0.05)-0.2,y=max(plotme$est),label='p=0.05',
-             color='blue') 
-  }
-  print(p)
-  plotme # return this so I can re-use it below
-}
+source('lm_plot.R')
 replace_text <- data.frame(label=c('it1','ur','tr_idx','ca_idx','aut_idx',
                                    'q3c_5','pole2n','for6','a4_5','ocup4a_3',
                                    'mil10c','pol1','clien1n','aoj22_1'),
@@ -201,7 +132,7 @@ replace_text <- data.frame(label=c('it1','ur','tr_idx','ca_idx','aut_idx',
                                   'Crime prevention over punishment'),
                            stringsAsFactors=FALSE)
 label_offsets <- data.frame(label=c('it1','a4_5','for6','clien1n','pol1'),
-                            x=c(-0.4,0.7,0.2,0.1,0.3),y=c(0,-0.02,0.02,-0.02,0))
+                            x=c(0,0.7,0.2,0.1,0.3),y=c(0,-0.02,0.02,-0.02,0))
 flip_us <- c('it1','ur','for6','mil10c','pol1','clien1n')
 plotme_all <- lm_plot(b.reg2,a2,'Region-wide',p_max=0.01,text=replace_text,
                       offsets=label_offsets,flip=flip_us,width=20)
@@ -474,7 +405,25 @@ h_form <- 'fear_idx ~ a4_22 + aut_idx + b20 + clien1na + coer1 + ico2 + it1 +
            tr_idx + ur'
 h.reg <- with(data=h_imp,exp=lm(as.formula(h_form)))
 
-plotme_h <- lm_plot(h.reg,h2,'Honduras')
+replace_text <- data.frame(label=c('it1','ur','tr_idx','aut_idx',
+                                   'pole2n',
+                                   'mil10c','ico2','pr3e','coer1',
+                                   'sd3new2'),
+                           long=c('Interpersonal trust','Urbanization',
+                                  'Trust in government',
+                                  'Authoritarianism',
+                                  'Dissatisfaction with police',
+                                  'Trust in Iran',"Nat'l Police patrols",
+                                  'Bribe to build/renovate',
+                                  'Receipt from neighborhood stores',
+                                  'Dissatisfaction with public schools'),
+                           stringsAsFactors=FALSE)
+# TODO: Set these offsets when I'm working with the big monitor.
+label_offsets <- data.frame(label=c('pr3e','coer1','tr_idx'),
+                            x=c(0,0.35,0.1),y=c(0.02,0,0))
+flip_us <- c('it1','ur','mil10c','ico2','coer1')
+plotme_h <- lm_plot(h.reg,h2,'Honduras',p_max=0.01,text=replace_text,
+                      offsets=label_offsets,flip=flip_us,width=20)
 # tmp <- summary(pool(h.reg))
 # tmp[order(tmp[,5]),c(1,5)]
 ```
