@@ -1,0 +1,194 @@
+---
+title: "Trust in Government Index"
+author: "Jorge L. Perez"
+date: "31 October 2015"
+output: html_document
+---
+
+The following is a proposal for a Trust in Government Index, for which the following variables were considered to be the most relevant in determining the citizens' trust in all civic, public, political and governmental structures. The following variables were measured in Guatemala (this is a shorter list than for Honduras and El Salvador).
+
+* `b1`: Courts Guarantee a Fair Trial (1=Not at all, 7=A lot)
+* `b2`: Respect for Political Institutions (1=Not at all, 7=A lot)
+* `b3`: Respect for Basic Rights (1=Not at all, 7=A lot)
+* `b4`: Pride in Political System (1=Not at all, 7=A lot)
+* `b6`: People Should Support the Political System (1=Not at all, 7=A lot)
+* `b10a`: Trust in Judicial System (1=Not at all, 7=A lot)
+* `b12`: Trust in Armed Forces (1=Not at all, 7=A lot)
+* `b13`: Trust in National Legislature (1=Not at all, 7=A lot)
+* `b18`: Trust in National Police (1=Not at all, 7=A lot)
+* `b21`: Trust in Political Parties (1=Not at all, 7=A lot)
+* `b21a`: Trust in Executive (1=Not at all, 7=A lot)
+* `b32`: Trust in Local Government (1=Not at all, 7=A lot)
+* `b47a`: Trust in Elections (1=Not at all, 7=A lot)
+* `n9`: Evaluation of Administration's Handling of Corruption (1=Not at all, 7=A lot)
+* `n11`: Evaluation of Administration's Handling of Citizen Security (1=Not at all, 7=A lot)
+* `n15`: Evaluation of Administration's Handling of Economy (1=Not at all, 7=A lot)
+* `b3milx`: Armed Forces Respect Human Rights (1=Not at all, 7=A lot)
+* `pr4`: Government Respects Private Property (1=Not at all, 7=A lot)
+* `m1`: Presidential Job Performance (1=Very Good, 5=Very Bad)
+
+
+```{r}
+library(ggplot2)
+library(mice)
+library(plyr) # nice for re-formatting data
+library(GGally) # for plot matrices
+set.seed(12345) # makes imputation reproducible
+
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
+lapop.2014.GTM <- read.csv('../../2014-GTM.csv')
+my_data <- lapop.2014.GTM[,c('b1','b2','b3','b4','b6','b10a','b12','b13','b18',
+                             'b21','b21a','b32', 'b47a','n9','n11','n15',
+                             'b3milx','pr4','m1')]
+is.na(my_data[my_data>16]) <- TRUE
+nrow(na.omit(my_data))
+```
+
+Ignoring rows with missing values, we end up with 1,209 rows left.
+
+```{r}
+sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
+```
+
+2.8% of missing values.
+
+```{r}
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+plot(pr_complete)
+summary(pr_complete)
+```
+
+Without imputation, 38% of variance is concentrated in the first principal component.
+
+```{r}
+my_imp <- mice(my_data,printFlag = F) 
+my_imp
+```
+A few variables stand out as needing some imputation; `b3`(Respect for Basic Rights) and `b6` (Support for Political System), in particular. In general, though, not much imputation was required.
+
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+plot(pr[[1]])
+summary(pr[[1]])
+```
+
+Following imputation, 37.4% of variance remained concentrated in the first principal component.
+
+```{r}
+pc1 <- pr[[1]]$x[,1]
+pc2 <- pr[[1]]$x[,2]
+qplot(pc1,pc2) + theme_classic()
+```
+
+The distribution along PC1 seems smooth, indicating that this isn't dominated by a single variable.
+
+```{r}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc1) + theme_classic()
+```
+
+Correlations between imputations are high; distributions are well-behaved.
+
+```{r,fig.height=5,fig.width=10}
+all_pc1$avg <- rowMeans(all_pc1)
+q25 <- quantile(all_pc1$avg)[2]
+q75 <- quantile(all_pc1$avg)[4]
+qchange <- data.frame(low=colMeans(my_data[all_pc1$avg <= q25,],na.rm=TRUE),
+                      hi=colMeans(my_data[all_pc1$avg >= q75,],na.rm=TRUE))
+qchange$slope <- qchange$hi - qchange$low
+qchange$label <- rownames(qchange)
+qchange$even <- rank(qchange$hi)/nrow(qchange)*max(c(qchange$low,qchange$hi))
+ggplot(data=qchange) +
+  geom_segment(aes(x=0,y=qchange$low,xend=1,yend=qchange$hi,
+                   color=qchange$slope),size=1) +
+  scale_color_gradient(low='#FF420E',high='#89DA59') +
+  geom_text(aes(x=1,y=qchange$even,label=qchange$label,
+                hjust=0,color=qchange$slope),size=5) +
+  annotate("text",x=0,y=0,label='Average in lowest quartile',hjust=0) +
+  annotate("text",x=1,y=0,label='Average in highest quartile',hjust=1) +
+  scale_x_continuous(limits=c(0,1.5)) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title=element_blank(),
+        text=element_text(size=20))
+```
+
+Most variables tend to increase with PC1; recall that higher values indicate more trust in government institutions. The exception is `m1`, where a low score indicates a high opinion of the president's job performance, so a decrease makes sense.
+
+```{r}
+all_pc1$norm <- scale(all_pc1$avg) 
+predict_data <- data.frame(b1=c(1,7),b2=c(1,7),b3=c(1,7),b4=c(1,7),
+                           b6=c(1,7),b10a=c(1,7),b12=c(1,7),
+                           b13=c(1,7),b18=c(1,7),b21=c(1,7),b21a=c(1,7),
+                           b32=c(1,7),b47a=c(1,7),n9=c(1,7), n11=c(1,7),  n15=c(1,7),b3milx=c(1,7), pr4=c(1,7), m1=c(5,1))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) 
+
+predict_data2 <- data.frame(diag(19)+1)
+names(predict_data2) <- names(my_data)
+predict_data2$m1 <- 6 - predict_data2$m1
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+ggplot(diff,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+All variables seem to have a significant impact on the score; `m1` has the smallest influence. Because all variables take on multiple values, we can obtain p-values froml linear regression.
+
+```{r}
+lmp <- function (modelobject) {
+    if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+    f <- summary(modelobject)$fstatistic
+    p <- pf(f[1],f[2],f[3],lower.tail=F)
+    attributes(p) <- NULL
+    return(p)
+}
+sapply(c('b1','b2','b3', 'b4','b6','b10a','b12','b13',
+                             'b18','b21','b21a','b32', 'b47a','n9','n11','n15', 'b3milx', 'pr4'),
+       function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
+```
+
+All are impressively low.
+
+```{r}
+b2 <- data.frame(q=my_data$b2,w=all_pc1$norm)
+b2 <- na.omit(b2)
+my_lm <- lm(data=b2, q ~ w)
+summary(my_lm)
+ggplot(b2,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
+  ylab('b2') +
+  xlab('Composite index') +
+  theme(text=element_text(size=20))
+```
+
+```{r}
+m1 <- data.frame(q=my_data$m1,w=all_pc1$norm)
+m1 <- na.omit(m1)
+my_lm <- lm(data=m1, q ~ w)
+summary(my_lm)
+ggplot(b2,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
+  ylab('m1') +
+  xlab('Composite index') +
+  theme(text=element_text(size=20))
+```
