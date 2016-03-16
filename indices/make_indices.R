@@ -58,7 +58,7 @@ sanity_check <- function(data,idx,var) {
 ## Fear index
 ###############################################################################
 
-fear_common <- c('vic44','fear10','vic1ext','vic1exta','vic1hogar','aoj11',
+fear_common <- c('fear10','vic1ext','vic1exta','vic1hogar','aoj11',
                  'pese1','pese2','aoj17','diso7','diso8','diso10','diso18',
                  'diso14','diso16','diso17','vicbar1','vicbar1f','vicbar3',
                  'vicbar4','vicbar7')
