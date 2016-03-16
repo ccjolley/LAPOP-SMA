@@ -9,7 +9,7 @@ This index will measure the a respondant's inclination toward authoritarian poli
 
 - `dem2`: Support for democracy or dictatorship (1=either is OK, 2=democracy, 3=dictatorship)
 - `dem11`: Support for mano dura policies (1=iron fist, 2=broad participation)
-- `aut1`: Strong leader vs. electoral democracy (1=strong leader, 2=electoral democracy)
+- `aut1`: Strong leader vs. electoral democracy (1=strong leader, 2=electoral democracy) (Honduras only)
 - `jc10`: Coup is justified when crime is high (1=yes, 2=no)
 - `jc13`: Coup is justified when corruption is high (1=yes, 2=no)
 - `jc15a`: President justified in governing without legislature during crisis (1=yes, 2=no)
@@ -71,7 +71,7 @@ PCA results look very similar to what we saw without imputation, which is good.
 ```{r, fig.width=10, fig.height=10}
 pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
-qplot(pc1,pc2) + theme_classic
+qplot(pc1,pc2) + theme_classic()
 ```
 
 The distribution of PC1 seems to fall into three bands, suggesting that the index is dominated by one variable that takes on three values.
@@ -84,10 +84,12 @@ ggpairs(all_pc1) + theme_classic()
 
 All of our imputations are really well-correlated, and the highest-valued band is the most heavily-populated one.
 
-```{r}
+```{r, fig.width=10, fig.height=5}
 all_pc1$avg <- rowMeans(all_pc1)
-qchange <- data.frame(low=colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE),
-                      hi=colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE))
+q25 <- quantile(all_pc1$avg)[2]
+q75 <- quantile(all_pc1$avg)[4]
+qchange <- data.frame(low=colMeans(my_data[all_pc1$avg <= q25,],na.rm=TRUE),
+                      hi=colMeans(my_data[all_pc1$avg >= q75,],na.rm=TRUE))
 qchange$slope <- qchange$hi - qchange$low
 qchange$label <- rownames(qchange)
 qchange$even <- rank(qchange$hi)/nrow(qchange)*max(qchange$hi)
