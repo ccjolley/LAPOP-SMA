@@ -42,6 +42,8 @@ The following indicators related to fear and violence were measured in Guatemala
 
 Note that `vic44` appears to be on topic, but turns out not to correlate strongly with this index; we won't include it.
 
+Also note that the values of `vic40`-`vic45` are different in Guatemala than they are in Honduras; we'll need to account for that when creating a regional index.
+
 ```{r,message=FALSE}
 library(ggplot2)
 library(mice)

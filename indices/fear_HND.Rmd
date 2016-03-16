@@ -1,17 +1,20 @@
-fear index
-calbano
+---
+title: "Fear index"
+author: "Craig Jolley"
+date: "March 16, 2016"
+output: html_document
+---
 
-October 18, 2015
 ```{r}
-lapop.2014.HND <- read.csv("../HND-2014.csv")
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
+lapop.2014.HND <- read.csv("../../HND-2014.csv")
 ```
 
-This time around, let’s go with the big list: 
+The following indicators related to fear and violence were measured in Honduras:
 
 - vic40: Out of fear of crime, has limited the places to go shopping (1=yes, 2=no) 
 - vic41: Out of fear of crime, has limited the places to go for recreation (1=yes, 2=no) 
 - vic43: Out of fear of crime, has felt the need to change neighborhoods (1=yes, 2=no) 
-- vic44: Organized in Neighborhood for Security (0 = no, 1=yes) 
 - vic45: Out of fear of crime, has changed jobs (1=yes, 2=no) 
 - fear10: Avoided Walking Through Dangerous Areas  (0=no, 1=yes) 
 - fear6f: Insecurity at Schools (1 = a lot, 4 = not at all) 
@@ -35,6 +38,10 @@ This time around, let’s go with the big list:
 - vicbar4: Extortion or Blackmail in the Neighborhood (1=yes, 2=no)
 - vicbar7: Murders in the Neighborhood (1=yes, 2=no) 
 - a4 == 5,14,27,30,57: Biggest problem related to crime/violence/security
+
+Note that `vic44` appears to be on topic, but turns out not to correlate strongly with this index; we won't include it.
+
+Also note that the values of `vic40`-`vic45` are different in Honduras than they are in Guatemala; we'll need to account for that when creating a regional index.
 
 ```{r,message=FALSE}
 library(ggplot2)
@@ -104,6 +111,7 @@ ggplot(df1,aes(x=pc,y=cum,color=group)) +
 ```
 
 Imputation actually increased the fraction of variance in the first component to 44%.
+
 ```{r}
 PC1 <- pr[[1]]$x[,1]
 PC2 <- pr[[1]]$x[,2]
@@ -121,9 +129,10 @@ all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
-Plot of PC1 vs PC2 shows a much smoother distribution than before; this probably isn’t dominated by a singe discrete variable. Correlations for different imputed datasets are about 0.997 – imputation is much more consistent when you use more data.
 
-```{r}
+Plot of PC1 vs PC2 shows a much smoother distribution than before; this probably isn’t dominated by a singe discrete variable. Correlations for different imputed datasets are about 0.997.
+
+```{r,fig.height=8,fig.width=10}
 all_pc1$avg <- rowMeans(all_pc1)
 qchange <- data.frame(low=colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE),
                       hi=colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE))
@@ -152,7 +161,8 @@ Compared to the lowest quantile, the highest quantile of our proposed index has:
 
 Higher values for vic40, vic41, vic43, fear6f (higher values of these mean less fear) also: vic1ext, vic1hogar, pese1, pese2, aoj17, diso7, diso8, diso10, diso14, diso16, diso17, vicbar1, vicbar1f, vicbar3, vicbar4, vicbar7 About the same values for vic45 (got imputed a lot; probably really noisy) Lower values for vic44 and fear10 (lower values of these mean not changing behavior) lower values for vic1exta, aoj11, a4
 
-So it looks like (as before) high values of the index indicate not being particularly concerned about crime and violence.
+So it looks like high values of the index indicate not being particularly concerned about crime and violence; we'll need to flip the direction of the index.
+
 ```{r}
 all_pc1$norm <- scale(-all_pc1$avg) # sign flip -- now high values mean more fear
 predict_data <- data.frame(vic40 = c(2,1), vic41 = c(2,1), vic43 = c(2,1), vic45=c(2,1),
@@ -224,7 +234,7 @@ ggplot(diff, aes(x=n,y=d)) +
         axis.title.y = element_blank())
 ```
 
-So vic45 (changing jobs out of fear of crime) and a4 (what is the biggest problem?) don’t have a really strong influence here; we might want to drop them from the index. The ones that really dominate here are the diso indicators, asking people what they feel is a problem in their neighborhood.
+So `vic45` (changing jobs out of fear of crime) and `a4` (what is the biggest problem?) don’t have a really strong influence here. The ones that really dominate here are the diso indicators, asking people what they feel is a problem in their neighborhood.
 
 ```{r}
 vic44 <- data.frame(q=my_data$vic44,w=fear$w)
@@ -261,7 +271,6 @@ ggplot(fear6f,aes(x=w,y=q)) +
 
 ```
 
-This is a good correlation, but it’s not nearly as strong as what we saw with the old version of this index, because fear10 doesn’t dominate it as completely as before.
 ```{r}
 diso8 <- data.frame(q=my_data$diso8,w=fear$w)
 my_lm <- lm(data=diso8, q ~ w)
@@ -276,7 +285,8 @@ ggplot(diso8,aes(x=w,y=q)) +
   theme(text=element_text(size=20))
 ```
 
-P-Values for variables that can have more than 2 values fear6f
+Here's one way to visualize the significance of correlations with the fear index:
+
 ```{r}
 bin_cor <- function(var2) {
   # Determine the correlation between a variable var1 and a binary variable 
@@ -333,4 +343,4 @@ ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=var)) +
   ylab('Influence on fear index')
 ```
 
-vic45 and a4 appear not to be highly significant; we might want to drop those.
+So while many variables have a small influence, all of them correlate significantly (p < 0.01).
