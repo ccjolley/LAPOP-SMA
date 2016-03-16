@@ -1,0 +1,178 @@
+---
+title: "Sympathy with government critics index"
+author: "Craig Jolley"
+date: "March 16, 2016"
+output: html_document
+---
+
+This index measures a respondant's level of sympathy with government critics -- you could think of it as a measure of political tolerance. It includes the following variables, which are common to all three Northern Triangle countries:
+
+- `d1`: Approval of government critics' right to vote (1=low, 10=high)
+- `d2`: Approval of government critics' right to hold peaceful demonstrations
+- `d3`: Approval of government critics' right to run for office
+- `d4`: Approval of government critics' right to make speeches
+- `e5`: Approval of participation in legal demonstrations (1=disapprove, 10=approve)
+- `e15`: Approval of blocking roads during protest (1=approve, 10=disapprove)
+- `e3`: Approval of groups attempting to overthrow government (1=disapprove, 10=approve)
+- `e16`: Approval of vigilante justice (1=disapprove, 10=approve)
+
+To start off, we'll load the necessary packages:
+
+```{r, message=FALSE}
+library(ggplot2)
+library(mice)
+library(plyr) 
+library(GGally) 
+```
+
+We'll load all three 2014 datasets and construct a data frame containing the columns we want.
+
+```{r}
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
+lapop.2014.GTM <- read.csv('../../2014-GTM.csv')
+lapop.2014.SLV <- read.csv('../../2014-SLV.csv')
+lapop.2014.HND <- read.csv('../../2014-HND.csv')
+v <- c('d1','d2','d3','d4','e5','e15','e3','e16')
+my_data <- rbind(lapop.2014.GTM[,v],lapop.2014.SLV[,v],lapop.2014.HND[,v])
+is.na(my_data[my_data>16]) <- TRUE
+```
+
+What does PCA looks like with the complete data?
+
+```{r}
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+plot(pr_complete)
+summary(pr_complete)
+```
+
+38% of variance is in the first principal component -- pretty typical for our composite indices.
+
+```{r}
+set.seed(12345)
+my_imp <- mice(my_data,printFlag = F) 
+my_imp
+```
+
+None of these involved a lot of imputation; in general the questions about the political rights of government critics (`d1`,`d2`,`d3`,`d4`) needed more imputation than the questions about the appropriateness of protests or anti-government activity. 
+
+Look at PCA for one of our imputed datasets:
+
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+plot(pr[[1]])
+summary(pr[[1]])
+```
+
+PCA results look very similar to what we saw without imputation, which is good.
+
+```{r, fig.width=10, fig.height=10}
+pc1 <- pr[[1]]$x[,1]
+pc2 <- pr[[1]]$x[,2]
+qplot(pc1,pc2) + theme_classic()
+```
+
+This scatterplot shows a very continuous distribution along PC1; a good sign that a single variable doesn't really dominate this index. It helps that each variable can take a large number of values, meaning that a large number of combinations are possible (and present).
+
+```{r, fig.width=10, fig.height=10}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc1) + theme_classic()
+```
+
+All of our imputations are really well-correlated, and the distributions of PC1 look well-behaved.
+
+```{r, fig.width=10, fig.height=5}
+all_pc1$avg <- rowMeans(all_pc1)
+q25 <- quantile(all_pc1$avg)[2]
+q75 <- quantile(all_pc1$avg)[4]
+qchange <- data.frame(low=colMeans(my_data[all_pc1$avg <= q25,],na.rm=TRUE),
+                      hi=colMeans(my_data[all_pc1$avg >= q75,],na.rm=TRUE))
+qchange$slope <- qchange$hi - qchange$low
+qchange$label <- rownames(qchange)
+qchange$even <- rank(qchange$hi)/nrow(qchange)*max(qchange$hi)
+ggplot(data=qchange) +
+  geom_segment(aes(x=0,y=qchange$low,xend=1,yend=qchange$hi,
+                   color=qchange$slope),size=1) +
+  scale_color_gradient(low='#FF420E',high='#89DA59') +
+  geom_text(aes(x=1,y=(qchange$even+qchange$hi)/2,label=qchange$label,
+                hjust=0,color=qchange$slope),size=5) +
+  annotate("text",x=0,y=0,label='Average in lowest quartile',hjust=0) +
+  annotate("text",x=1,y=0,label='Average in highest quartile',hjust=1) +
+  scale_x_continuous(limits=c(0,1.5)) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title=element_blank(),
+        text=element_text(size=20))
+```
+
+All variables increase with PC1 -- high values indicate greater approval of dissident rights, so our index is pointing in the right direction. The steepest slope (i.e. the largest difference between the lowest and highest quartiles) belongs to `d2` (approval of critics' right to hold peaceful demonstrations), while `e3` (approval of groups trying to overthrow the government) has the shallowest slope. Even the most tolerant people don't have much patience with revolutionaries.
+
+Let's normalize and average PC1:
+
+```{r}
+all_pc1$norm <- scale(all_pc1$avg)
+```
+
+Now, let's see how each variable contributes to the composite score:
+
+```{r,warning=FALSE}
+predict_data <- data.frame(d1=c(1,10),d2=c(1,10),d3=c(1,10),d4=c(1,10),
+                           e5=c(1,10),e15=c(1,10),e3=c(1,10),e16=c(1,10))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (minmax-mean(all_pc1$avg)) / sd(all_pc1$avg)
+
+predict_data2 <- data.frame(diag(8)+1)
+names(predict_data2) <- names(my_data)
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg)
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+ggplot(diff,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+This is roughly what we'd expect -- all variables have an influence, with `d2` the strongest and `e3` the weakest.
+
+We can be more rigorous about this by calculating p-values. As all variables are measured on a 1-10 scale, we can do this using linear regression.
+
+```{r}
+lmp <- function (modelobject) {
+    if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+    f <- summary(modelobject)$fstatistic
+    p <- pf(f[1],f[2],f[3],lower.tail=F)
+    attributes(p) <- NULL
+    return(p)
+}
+sapply(c('d1','d2','d3','d4','e3','e5','e15','e16'),
+       function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
+```
+
+All are extremely significant.
+
+We'll visualize `e16` (approval of vigilante justice); modify the code below if you want to look at the others:
+
+```{r}
+e16 <- data.frame(q=my_data$e16,w=all_pc1$norm)
+e16 <- na.omit(e16)
+my_lm <- lm(data=e16, q ~ w)
+summary(my_lm)
+ggplot(e16,aes(x=w,y=q)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.2) +
+  theme_classic() +
+  geom_smooth(method='lm',size=2,color='royalblue') +
+  annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
+           size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
+  ylab('e16') +
+  xlab('Composite index') +
+  theme(text=element_text(size=20)) 
+```
+
+The correlation is far from perfect, but people with a high value of our index are significantly more likely to appove of vigilante justice. It's interesting that `e16` seems fairly polarized, with a lot of people answering either 1 or 10.
