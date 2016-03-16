@@ -5,27 +5,39 @@ date: "31 October 2015"
 output: html_document
 ---
 
-The following is a proposal for a Trust in Government Index, for which the following variables were considered to be the most relevant in determining the citizens' trust in all civic, public, political and governmental structures. The following variables were measured in Guatemala (this is a shorter list than for Honduras and El Salvador).
+The following is a proposal for a Trust in Government Index, for which the following variables measured in El Salvador were considered to be the most relevant in determining the citizens' trust in all civic, public, political and governmental structures:
 
-* `b1`: Courts Guarantee a Fair Trial (1=Not at all, 7=A lot)
+* `b1`: Courts Guarantee Fair Trial (1=Not at all, 7=A lot)
 * `b2`: Respect for Political Institutions (1=Not at all, 7=A lot)
 * `b3`: Respect for Basic Rights (1=Not at all, 7=A lot)
 * `b4`: Pride in Political System (1=Not at all, 7=A lot)
 * `b6`: People Should Support the Political System (1=Not at all, 7=A lot)
 * `b10a`: Trust in Judicial System (1=Not at all, 7=A lot)
+* `b11`: Trust in the National Electoral Institution (1=Not at all, 7=A lot)
 * `b12`: Trust in Armed Forces (1=Not at all, 7=A lot)
-* `b13`: Trust in National Legislature (1=Not at all, 7=A lot)
+* `b13`: Trust in the National Legislature (1=Not at all, 7=A lot)
 * `b18`: Trust in National Police (1=Not at all, 7=A lot)
 * `b21`: Trust in Political Parties (1=Not at all, 7=A lot)
 * `b21a`: Trust in Executive (1=Not at all, 7=A lot)
 * `b32`: Trust in Local Government (1=Not at all, 7=A lot)
 * `b47a`: Trust in Elections (1=Not at all, 7=A lot)
+* `esb48`: Trust in the Institute of Access to Public Information (1=Not at all, 7=A lot)
 * `n9`: Evaluation of Administration's Handling of Corruption (1=Not at all, 7=A lot)
 * `n11`: Evaluation of Administration's Handling of Citizen Security (1=Not at all, 7=A lot)
 * `n15`: Evaluation of Administration's Handling of Economy (1=Not at all, 7=A lot)
+* `epp1`: Political Parties Represent Voters Well (1=Not at all, 7=A lot)
+* `epp3`: Political Parties Listen to Voters (1=Not at all, 7=A lot)
 * `b3milx`: Armed Forces Respect Human Rights (1=Not at all, 7=A lot)
 * `pr4`: Government Respects Private Property (1=Not at all, 7=A lot)
-* `m1`: Presidential Job Performance (1=Very Good, 5=Very Bad)
+* `epn3a`: Central Governement Represents Your Interests (1=A lot, 4=Not at all)
+* `epn3b`: Legislative Representative Represents Your Interests (1=A lot, 4=Not at all)
+* `epn3c`: Mayor and City Council Represent Your Interests (1=A lot, 4=Not at all)
+
+As is to be expected with a LAPOP study, there are questions that were adapted to reflect the national reality of a country. Here we have examples of a few variables that we did not see for Honduras, but that were selected for this proposed Trust Index for El Salvador:
+
+* `esb48` - which presents an institution particular to El Salvador's civil and political structure
+* `epn3a`, `epn3b`, `epn3c` - which reflect confidence on these institutions, and their democratic nature
+* `pr4`- reflecting confidence in the government's role in society
 
 
 ```{r}
@@ -36,44 +48,48 @@ library(GGally)
 set.seed(12345) 
 
 setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
-lapop.2014.GTM <- read.csv('../../2014-GTM.csv')
-my_data <- lapop.2014.GTM[,c('b1','b2','b3','b4','b6','b10a','b12','b13','b18',
-                             'b21','b21a','b32', 'b47a','n9','n11','n15',
-                             'b3milx','pr4','m1')]
+lapop.2014.SLV <- read.csv('../../2014-SLV.csv')
+
+my_data <- lapop.2014.SLV[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13',
+                             'b18','b21','b21a','b32', 'b47a','esb48','n9',
+                             'n11','n15','epp1','epp3','b3milx','pr4','epn3a',
+                             'epn3b','epn3c')]
+
 is.na(my_data[my_data>16]) <- TRUE
 nrow(na.omit(my_data))
 ```
 
-Ignoring rows with missing values, we end up with 1,209 rows left.
+With missing values, we are left with 1,354 rows.
 
 ```{r}
 sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
 ```
 
-2.8% of missing values.
+Around 1% of missing values.
 
 ```{r}
 my_complete <- na.omit(my_data)
-pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=TRUE)
 plot(pr_complete)
 summary(pr_complete)
 ```
 
-Without imputation, 38% of variance is concentrated in the first principal component.
+Without any imputation, about 37% of my variance is concentrated in my first principle component.
 
 ```{r}
 my_imp <- mice(my_data,printFlag = F) 
 my_imp
 ```
-A few variables stand out as needing some imputation; `b3`(Respect for Basic Rights) and `b6` (Support for Political System), in particular. In general, though, not much imputation was required.
+
+None of the variables seems to stand out as needing much imputation, with the exception of, perhaps, `esb48`. Again, it is most likely that the Institute of Access to Public Information is not that well-known.
 
 ```{r}
-pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=TRUE,center=TRUE))
 plot(pr[[1]])
 summary(pr[[1]])
 ```
 
-Following imputation, 37.4% of variance remained concentrated in the first principal component.
+Following the imputation, not much has changed. 36.75% of variance is concentrated on the first principle component.
 
 ```{r}
 pc1 <- pr[[1]]$x[,1]
@@ -118,22 +134,29 @@ ggplot(data=qchange) +
         text=element_text(size=20))
 ```
 
-Most variables tend to increase with PC1; recall that higher values indicate more trust in government institutions. The exception is `m1`, where a low score indicates a high opinion of the president's job performance, so a decrease makes sense.
+All variables increase with PC1, except for `epn3a` through `epn3c`. For most variables, higher values indicate a higher level of trust in government, while the opposite is true for the `epn` variables. our index is pointing in the right direction.
 
 ```{r}
 all_pc1$norm <- scale(all_pc1$avg) 
 predict_data <- data.frame(b1=c(1,7),b2=c(1,7),b3=c(1,7),b4=c(1,7),
-                           b6=c(1,7),b10a=c(1,7),b12=c(1,7),
+                           b6=c(1,7),b10a=c(1,7),b11=c(1,7),b12=c(1,7),
                            b13=c(1,7),b18=c(1,7),b21=c(1,7),b21a=c(1,7),
-                           b32=c(1,7),b47a=c(1,7),n9=c(1,7), n11=c(1,7),  n15=c(1,7),b3milx=c(1,7), pr4=c(1,7), m1=c(5,1))
+                           b32=c(1,7),b47a=c(1,7),esb48=c(1,7),
+                           n9=c(1,7), n11=c(1,7), n15=c(1,7),epp1=c(1,7), 
+                           epp3=c(1,7),b3milx=c(1,7), pr4=c(1,7), epn3a=c(4,1), 
+                           epn3b=c(4,1),epn3c=c(4,1))
 minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
-minmax <- (minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) 
+minmax <- (minmax-mean(all_pc1$avg)) / sd(all_pc1$avg) 
+# compares well with quantile(all_pc1$norm)
 
-predict_data2 <- data.frame(diag(19)+1)
+predict_data2 <- data.frame(diag(25)+1)
 names(predict_data2) <- names(my_data)
-predict_data2$m1 <- 6 - predict_data2$m1
+predict_data2$epn3a <- 5 - predict_data2$epn3a
+predict_data2$epn3b <- 5 - predict_data2$epn3b
+predict_data2$epn3c <- 5 - predict_data2$epn3c
 scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
 scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
+# sanity check: are all scores just a little above minmax[1]?
 diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
 ggplot(diff,aes(x=n,y=d)) +
   geom_bar(stat='identity',fill='skyblue') +
@@ -144,7 +167,9 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.x=element_blank())
 ```
 
-All variables seem to have a significant impact on the score; `m1` has the smallest influence. Because all variables take on multiple values, we can obtain p-values froml linear regression.
+Most variables influence the score to a similar degree.
+
+Now onto a calculation of p-values, we see that-
 
 ```{r}
 lmp <- function (modelobject) {
@@ -154,41 +179,42 @@ lmp <- function (modelobject) {
     attributes(p) <- NULL
     return(p)
 }
-sapply(c('b1','b2','b3', 'b4','b6','b10a','b12','b13',
-                             'b18','b21','b21a','b32', 'b47a','n9','n11','n15', 'b3milx', 'pr4'),
+sapply(c('b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
+                             'b18','b21','b21a','b32', 'b47a','esb48','n9','n11','n15', 'epp1', 'epp3', 'b3milx', 'pr4', 'epn3a', 'epn3b','epn3c'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
 
-All are impressively low.
+all of the variables correlate strongly with the proposed index.
 
 ```{r}
-b2 <- data.frame(q=my_data$b2,w=all_pc1$norm)
-b2 <- na.omit(b2)
-my_lm <- lm(data=b2, q ~ w)
+epn3c <- data.frame(q=my_data$epn3c,w=all_pc1$norm)
+epn3c <- na.omit(epn3c)
+my_lm <- lm(data=epn3c, q ~ w)
 summary(my_lm)
-ggplot(b2,aes(x=w,y=q)) +
+ggplot(epn3c,aes(x=w,y=q)) +
   geom_jitter(color='tomato3',size=5,alpha=0.2) +
   theme_classic() +
   geom_smooth(method='lm',size=2,color='royalblue') +
   annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
            size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
-  ylab('b2') +
+  ylab('epn3c') +
   xlab('Composite index') +
   theme(text=element_text(size=20))
 ```
 
+
 ```{r}
-m1 <- data.frame(q=my_data$m1,w=all_pc1$norm)
-m1 <- na.omit(m1)
-my_lm <- lm(data=m1, q ~ w)
+epn3a <- data.frame(q=my_data$epn3a,w=all_pc1$norm)
+epn3a <- na.omit(epn3a)
+my_lm <- lm(data=epn3a, q ~ w)
 summary(my_lm)
-ggplot(b2,aes(x=w,y=q)) +
+ggplot(epn3a,aes(x=w,y=q)) +
   geom_jitter(color='tomato3',size=5,alpha=0.2) +
   theme_classic() +
   geom_smooth(method='lm',size=2,color='royalblue') +
   annotate('text',label=paste("R-sq:",round(summary(my_lm)$r.squared,2)),  
            size=10,x=-0.5,y=2.5,hjust=0,vjust=0,color='royalblue') +
-  ylab('m1') +
+  ylab('epn3a') +
   xlab('Composite index') +
   theme(text=element_text(size=20))
 ```
