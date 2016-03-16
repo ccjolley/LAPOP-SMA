@@ -6,7 +6,8 @@ output: html_document
 ---
 
 ```{r}
-lapop.2014.HND <- read.csv("../HND-2014.csv")
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
+lapop.2014.HND <- read.csv("../../HND-2014.csv")
 ```
 
 - honqt1: Transparency of the presidency of the republic (1 = very, 4 = not at all)
@@ -58,7 +59,7 @@ ggplot(nm,aes(x=factor(var,levels=rev(var)),y=nmis)) +
         text=element_text(size=20))
 ```
 
-None of the variables have more than 20% missing; most everyone has an opinion about the police and fewer have one about the Institute for Access to Public Information.
+None of the variables have more than 20% missing; most everyone has an opinion about the police (`honqt5`) and fewer have one about the Institute for Access to Public Information (`honqt11`).
 
 Now calculate PCA for each of the imputed datasets.
 
@@ -107,7 +108,9 @@ names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
 
-```{r}
+Correlations between imputed datasets are high; distributions look good.
+
+```{r,fig.width=10,fig.height=5}
 all_pc1$avg <- rowMeans(all_pc1)
 qchange <- data.frame(low=colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE),
                       hi=colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE))
@@ -137,7 +140,7 @@ ggplot(data=qchange) +
 All values increase (toward less transparency) as the index increases -- need to flip sign below. 
 
 ```{r}
-all_pc1$norm <- scale(-all_pc1$avg) # sign flip -- now high values mean more fear
+all_pc1$norm <- scale(-all_pc1$avg) # now high values mean more transparency
 predict_data <- data.frame(honqt1=c(4,1))
 for (i in 2:12) {
   predict_data[,paste('honqt',i,sep='')] <- predict_data$honqt1
@@ -145,7 +148,7 @@ for (i in 2:12) {
 
 minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
 minmax <- (mean(all_pc1$avg) - minmax) / sd(all_pc1$avg)
-quantile(all_pc1$norm)
+#quantile(all_pc1$norm)
 trans <- data.frame(w=all_pc1$norm) 
 ```
 
@@ -156,6 +159,7 @@ predict_data2 <- 4 - predict_data2
 ```
 
 Now, in each row of predict_data2, all values are those that will give a lower score, except for one.
+
 ```{r}
 scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
 scores <- (mean(all_pc1$avg)-scores)/sd(all_pc1$avg)
@@ -201,11 +205,10 @@ ggplot(honqt11,aes(x=w,y=q)) +
   ylab('Transparency of the IAPI') +
   xlab('Transparency index') +
   theme(text=element_text(size=20))
-
 ```
 
+Test significance of correlations between the index and the component variables using linear regression.
 
-P-Values for variables that can have more than 2 values fear6f
 ```{r}
 lmp <- function (modelobject) {
   if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
@@ -214,12 +217,7 @@ lmp <- function (modelobject) {
     attributes(p) <- NULL
     return(p)
 }
-lm_data <- my_data[,c('vic1exta','aoj11','aoj17','pese1','pese2',
-                      'diso7','diso8','diso10','diso14','diso16','diso17',
-                      'diso18','elsdiso18','elsdiso19','vicbar7f','vicbar1f',
-                      'vicbar3')]
 sapply(my_data, function(x) lmp(lm(x ~ all_pc1$norm)))
-# All are very significant
 ```
 
-All are highly significant. Can we map this?
+All are highly significant.
