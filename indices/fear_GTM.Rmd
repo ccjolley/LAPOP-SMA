@@ -1,15 +1,22 @@
-fear index
+---
+title: "Fear index"
+author: "Craig Jolley"
+date: "March 16, 2016"
+output: html_document
+---
+
 
 ```{r}
-lapop.2014.GTM <- read.csv("../GTM-2014.csv")
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
+lapop.2014.GTM <- read.csv("../../GTM-2014.csv")
 ```
 
-The list for Guatemala is similar to Honduras, except that `vic45` is missing and we add `fear6e`
+The following indicators related to fear and violence were measured in Guatemala:
 
-- vic40: Out of fear of crime, has limited the places to go shopping (1=yes, 2=no) 
-- vic41: Out of fear of crime, has limited the places to go for recreation (1=yes, 2=no) 
-- vic43: Out of fear of crime, has felt the need to change neighborhoods (1=yes, 2=no) 
-- vic45: Out of fear of crime, has changed jobs (1=yes, 2=no) 
+- vic40: Out of fear of crime, has limited the places to go shopping (0=no, 1=yes) 
+- vic41: Out of fear of crime, has limited the places to go for recreation (0=no, 1=yes) 
+- vic43: Out of fear of crime, has felt the need to change neighborhoods (0=no, 1=yes) 
+- vic45: Out of fear of crime, has changed jobs (0=no, 1=yes) 
 - fear10: Avoided Walking Through Dangerous Areas  (0=no, 1=yes) 
 - fear6e: Insecurity on public transportation (1 = a lot, 4 = not at all) 
 - fear6f: Insecurity at Schools (1 = a lot, 4 = not at all) 
@@ -34,7 +41,6 @@ The list for Guatemala is similar to Honduras, except that `vic45` is missing an
 - vicbar7: Murders in the Neighborhood (1=yes, 2=no) 
 
 Note that `vic44` appears to be on topic, but turns out not to correlate strongly with this index; we won't include it.
-TODO: remove vic44
 
 ```{r,message=FALSE}
 library(ggplot2)
@@ -42,15 +48,14 @@ library(mice)
 library(plyr)
 library(GGally)
 set.seed(12345)
-my_data <- lapop.2014.GTM[,c('vic40', 'vic41', 'vic44', 'vic43',
+my_data <- lapop.2014.GTM[,c('vic40', 'vic41','vic43',
                              'fear10','fear6e','fear6f','vic1ext','vic1exta',
                              'vic1hogar','aoj11','pese1','pese2','aoj17',
                              'diso7','diso8','diso10','diso18','diso14',
                              'diso16','diso17','vicbar1','vicbar1f',
                              'vicbar3','vicbar4','vicbar7')]
-my_data$vic1exta[my_data$vic1exta > 800000] <- 0
-my_data$vicbar7f[my_data$vicbar7f > 800000] <- 0
-my_data$a4 <- as.numeric(lapop.2014.SLV$a4 %in% c(5,14,27,30,57))
+my_data[my_data$vic1exta > 800000,'vic1exta'] <- 0
+my_data$a4 <- as.numeric(lapop.2014.GTM$a4 %in% c(5,14,27,30,57))
 is.na(my_data[my_data>800000]) <- TRUE
 
 my_complete <- na.omit(my_data)
@@ -61,10 +66,13 @@ summary(pr_complete)
 ```
 
 40% of total variance winds up in the first component.
+
 ```{r}
 my_imp <- mice(my_data, printFlag = F)
 my_imp
 ```
+
+The only variable that got a lot of imputation was `vicbar1f` -- number of burglaries in the neighborhood. I can imagine a lot of people don't think they know how many burglaries happen in their neighborhood.
 
 Moving onto the PCA:
 ```{r}
@@ -74,20 +82,24 @@ summary(pr[[1]])
 ```
 
 Imputation actually increased the fraction of variance in the first component to 44%.
+
 ```{r}
 pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
-qplot(pc1,pc2)
+qplot(pc1,pc2) + theme_classic()
 ```
+
+Fairly continuous distribution along PC1 means that no single variable dominates.
 
 ```{r}
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
-Plot of PC1 vs PC2 shows a much smoother distribution than before; this probably isn’t dominated by a singe discrete variable. Correlations for different imputed datasets are about 0.997 – imputation is much more consistent when you use more data.
 
-```{r}
+Correlations for different imputed datasets are about 0.997 – imputation is consistent and distribution of PC1 looks well-behaved.
+
+```{r,fig.height=8,fig.width=10}
 all_pc1$avg <- rowMeans(all_pc1)
 qchange <- data.frame(low=colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE),
                       hi=colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE))
@@ -117,22 +129,21 @@ The `diso` variables all increase dramatically, while `aoj11` shows a dramatic d
 ```{r}
 all_pc1$norm <- scale(-all_pc1$avg) # sign flip -- now high values mean more fear
 predict_data <- data.frame(vic40 = c(0,1), vic41 = c(0,1), vic43 = c(0,1), 
-                           vic44 = c(0,1), fear10 = c(0,1), fear6e=c(4,1),
-                           fear6f = c(4,1), vic1ext = c(2,1),vic1exta=c(0,15),
+                           fear10 = c(0,1), fear6e=c(4,1),
+                           fear6f = c(4,1), vic1ext = c(2,1),
+                           vic1exta=c(0,max(my_data$vic1exta)),
                            vic1hogar=c(2,1),aoj11=c(1,4),pese1=c(3,1),
                            pese2=c(3,1),aoj17=c(4,1),diso7=c(5,1),diso8=c(5,1),
                            diso10=c(5,1),diso18=c(5,1),diso14=c(5,1),
                            diso16=c(5,1),diso17=c(5,1),vicbar1=c(2,1),
                            vicbar1f=c(3,1),vicbar3=c(2,1),vicbar4=c(2,1),
-                           vicbar7=c(2,1))
+                           vicbar7=c(2,1),a4=c(0,1))
 
 minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
-minmax <- (mean(all_pc1$avg) - minmax) / sd(all_pc1$avg)
+minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg)
 
 fear <- data.frame(w=all_pc1$norm) 
-```
 
-```{r}
 predict_data2 <- data.frame(diag(26))
 names(predict_data2) <- names(predict_data)
 # right now, you have something that would feed 0's and 1's into your score
@@ -166,7 +177,8 @@ scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
 scores <- (mean(all_pc1$avg)-scores)/sd(all_pc1$avg)
 ```
 
-Now you can see that all of the scores are reasonably close to the minimum value stored in minmax.
+All of the scores are reasonably close to the minimum value stored in minmax.
+
 ```{r}
 diff <- data.frame(d=(scores-minmax[1]), n = names(predict_data))
 ggplot(diff, aes(x=n,y=d)) + 
@@ -178,7 +190,7 @@ ggplot(diff, aes(x=n,y=d)) +
         axis.title.x = element_blank())
 ```
 
-From what I can see here; `vic44` doesn't have much of an effect; the others vary in size, with the `diso` variables showing the largest effect.
+The `diso` variables show the largest effect.
 
 ```{r}
 fear10 <- data.frame(q=my_data$fear10,w=fear$w)
@@ -209,7 +221,6 @@ ggplot(fear6f,aes(x=w,y=q)) +
   ylab('fear10') +
   xlab('Fear index') +
   theme(text=element_text(size=20))
-
 ```
 
 ```{r}
@@ -228,7 +239,8 @@ ggplot(diso8,aes(x=w,y=q)) +
   theme(text=element_text(size=20))
 ```
 
-P-Values for variables that can have more than 2 values 
+We'll use linear regression to get p-values for variables that can have more than 2 values, and a 2-sammple t-test for the binary variables.
+
 ```{r}
 lmp <- function (modelobject) {
   if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
@@ -241,8 +253,6 @@ lm_data <- my_data[,c('fear6f','fear6e','vic1exta','aoj11','aoj17','pese1','pese
                       'diso7','diso8','diso10','diso14','diso16','diso17',
                       'diso18','vicbar3')]
 sapply(lm_data, function(x) lmp(lm(x ~ all_pc1$norm)))
-# All are very significant
-# TODO: Find a way to visualize these
 
 bin_cor <- function(var) {
   tt <- t.test(all_pc1$norm[var==min(var,na.rm=TRUE)],
@@ -250,11 +260,10 @@ bin_cor <- function(var) {
   tt$p.value
 }
 
-bin_vars <- c('vic40','vic41','vic43','vic44','vic1ext','vic1hogar',
-                       'vicbar1','vicbar3','vicbar4','vicbar7')
+bin_vars <- c('vic40','vic41','vic43','vic1ext','vic1hogar',
+                       'vicbar1','vicbar3','vicbar4','vicbar7','a4')
 sapply(bin_vars,function(x) bin_cor(my_data[,x]))
 ```
 
-`vic44` isn't significant (as we'd expect at this point); we'll drop it and keep the rest.
-
+All are highly significant.
 
