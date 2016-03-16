@@ -1,3 +1,10 @@
+---
+title: "Fear index"
+author: "Jorge Perez"
+date: "December 9, 2015"
+output: html_document
+---
+
 The following is a proposed index for Political Violence, a phenomenon that has affected all three nations of the Northern Triangle, in varying degrees. While the studies done by LAPOP, do not provide any indicators of political violence for El Salvador and Honduras, there are several elements to take into consideration, so as to better comprehend the fabric of institutionalized violence in Guatemala.
 All of the variables chosen reflect the responses of whether or not the people, being interrogated, have witnessed any acts of violence related to political identification or electoral cycles.
 
@@ -18,13 +25,14 @@ All of the variables chosen reflect the responses of whether or not the people, 
 ```{r, message=FALSE}
 library(ggplot2)
 library(mice)
-library(plyr) # nice for re-formatting data
-library(GGally) # for plot matrices
-set.seed(12345) # makes imputation reproducible
+library(plyr) 
+library(GGally) 
+set.seed(12345) 
 ```
 
 ```{r}
-lapop.2014.GTM <- read.csv("../GTM-2014.csv")
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
+lapop.2014.GTM <- read.csv("../../GTM-2014.csv")
 my_data <- lapop.2014.GTM[,c('pv1','pv2a','pv2b','pv2c','pv2d','pv2e','pv2f',
                              'pv2g','pv2h','pv2i','pv2j','pv2k')]
 ```
