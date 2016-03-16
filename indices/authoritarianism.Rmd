@@ -1,0 +1,173 @@
+---
+title: "Authoritarianism index"
+author: "Craig Jolley"
+date: "March 16, 2016"
+output: html_document
+---
+
+This index will measure the a respondant's inclination toward authoritarian political attitudes. The following variables were measured in all three countries and correlate strongly with each other:
+
+- `dem2`: Support for democracy or dictatorship (1=either is OK, 2=democracy, 3=dictatorship)
+- `dem11`: Support for mano dura policies (1=iron fist, 2=broad participation)
+- `jc10`: Coup is justified when crime is high (1=yes, 2=no)
+- `jc13`: Coup is justified when corruption is high (1=yes, 2=no)
+- `jc15a`: President justified in governing without legislature during crisis (1=yes, 2=no)
+
+To start off, we'll load the necessary packages:
+
+```{r, message=FALSE}
+library(ggplot2)
+library(mice)
+library(plyr) 
+library(GGally) 
+```
+
+We'll load all three 2014 datasets and construct a data frame containing the columns we want.
+
+```{r}
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
+lapop.2014.GTM <- read.csv('../../2014-GTM.csv')
+lapop.2014.SLV <- read.csv('../../2014-SLV.csv')
+lapop.2014.HND <- read.csv('../../2014-HND.csv')
+v <- c('dem2','dem11','jc13','jc10','jc15a')
+my_data <- rbind(lapop.2014.GTM[,v],lapop.2014.SLV[,v],lapop.2014.HND[,v])
+#dem2 has sort of an odd scale -- switch 1 and 2
+my_data$dem2[my_data$dem2==1] <- 100
+my_data$dem2[my_data$dem2==2] <- 1
+my_data$dem2[my_data$dem2==100] <- 2
+is.na(my_data[my_data>16]) <- TRUE
+```
+
+We'll use multiple imputation to fill in missing data, but let's omit missing values first to be sure that everything makes sense.
+
+```{r}
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+plot(pr_complete)
+summary(pr_complete)
+```
+
+41% of variance is concentrated in the first component.
+
+```{r}
+set.seed(12345)
+my_imp <- mice(my_data,printFlag = F) 
+my_imp
+```
+
+Most variables had fairly similar numbers of missing values; people were least willing to talk about expanded presidential powers (`jc15a`) and most willing to talk about mano dura policies (`dem11`).
+
+What does PCA look like for one of the five imputed datasets?
+
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+plot(pr[[1]])
+summary(pr[[1]])
+```
+
+PCA results look very similar to what we saw without imputation, which is good.
+
+```{r, fig.width=10, fig.height=10}
+pc1 <- pr[[1]]$x[,1]
+pc2 <- pr[[1]]$x[,2]
+qplot(pc1,pc2) + theme_classic()
+```
+
+The distribution of PC1 seems to fall into three bands, suggesting that the index is dominated by one variable that takes on three values.
+
+```{r, fig.width=10, fig.height=10}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc1) + theme_classic()
+```
+
+All of our imputations are really well-correlated, and the lowest-valued band is the most heavily-populated one.
+
+```{r, fig.width=10, fig.height=5}
+all_pc1$avg <- rowMeans(all_pc1)
+q25 <- quantile(all_pc1$avg)[2]
+q75 <- quantile(all_pc1$avg)[4]
+qchange <- data.frame(low=colMeans(my_data[all_pc1$avg <= q25,],na.rm=TRUE),
+                      hi=colMeans(my_data[all_pc1$avg >= q75,],na.rm=TRUE))
+qchange$slope <- qchange$hi - qchange$low
+qchange$label <- rownames(qchange)
+qchange$even <- rank(qchange$hi)/nrow(qchange)*max(qchange$hi)
+ggplot(data=qchange) +
+  geom_segment(aes(x=0,y=qchange$low,xend=1,yend=qchange$hi,
+                   color=qchange$slope),size=1) +
+  scale_color_gradient(low='#FF420E',high='#89DA59') +
+  geom_text(aes(x=1,y=(qchange$even+qchange$hi)/2,label=qchange$label,
+                hjust=0,color=qchange$slope),size=5) +
+  annotate("text",x=0,y=0,label='Average in lowest quartile',hjust=0) +
+  annotate("text",x=1,y=0,label='Average in highest quartile',hjust=1) +
+  scale_x_continuous(limits=c(0,1.5)) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title=element_blank(),
+        text=element_text(size=20))
+```
+
+What are we seeing here? Compared to the lowest quantile, the highest quantile of our proposed index has much higher values for `dem2` and decreasing values for everything else. Recall that lower values for `dem2` indicate a preference for democracy, while higher values of the binary variables indicate less-authoritarian attitudes. Our scale in pointing in the right direction.
+
+Also note that `dem2` is the only variable that takes on three values; its strong slope in this plot suggests that it is the dominant factor in our index.
+
+Let's normalize and average PC1:
+
+```{r}
+all_pc1$norm <- scale(all_pc1$avg)
+```
+
+To confirm our suspicions about `dem2`, let's see how all variables contribute to the composite score.
+
+```{r,warning=FALSE}
+predict_data <- data.frame(dem2=c(1,3),dem11=c(2,1),jc13=c(2,1),
+                          jc10=c(2,1),jc15a=c(2,1))
+# The first row of predict_data should be the least-authoritarian response
+# possible, while the second is the most-authoritarian.
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (minmax-mean(all_pc1$avg)) / sd(all_pc1$avg)
+# should match quantile(all_pc1$norm)
+predict_data2 <- data.frame(2-diag(5))
+names(predict_data2) <- names(my_data)
+predict_data2[,'dem2'] <- 3 - predict_data2[,'dem2']
+scores <- rowMeans(sapply(1:5, function(i) 
+  predict(pr[[i]],predict_data2)[,1]))
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg)
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+ggplot(diff,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+While all five variables have an impact on the composite index, `dem2` has by far the strongest influence.
+
+We can be more rigorous about this by calculating p-values. We'll have to do this differently for `dem2` (which takes on three values) than for the ones that only take on two. 
+
+```{r}
+bin_cor <- function(var2) {
+  # Determine the correlation between all_pc1$norm and a binary variable 
+  # var2. This uses a Fisher test conditioned on the values of var2.
+  tmp <- data.frame(v1=all_pc1$norm,v2=my_data[,var2])
+  tmp$v2 <- tmp$v2 - min(tmp$v2,na.rm=TRUE) # convert to 0-1 scale
+  if (sum(tmp$v2==0,na.rm=TRUE) > 1 & sum(tmp$v2==1,na.rm=TRUE) > 1) {
+    tt <- t.test(tmp$v1[tmp$v2==0],tmp$v1[tmp$v2==1])
+    res=data.frame(var=var2,est=tt$estimate[2]-tt$estimate[1],pval=tt$p.value,
+                 stringsAsFactors=FALSE)
+  }
+  res
+}
+
+my_data$dem2_lo <- as.numeric(my_data$dem2 >= 2)
+my_data$dem2_hi <- as.numeric(my_data$dem2 > 2)
+bin_vars <- c('dem2_lo','dem2_hi','dem11','jc13','jc10','jc15a')
+ldply(bin_vars,bin_cor)
+```
+
+All are significantly-correlated (especially `dem2`).
