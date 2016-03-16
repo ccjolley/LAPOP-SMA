@@ -125,7 +125,6 @@ minmax <- (minmax - mean(all_pc1$avg)) / sd(all_pc1$avg)
 
 predict_data2 <- data.frame(diag(17)+1)
 names(predict_data2) <- names(my_data)
-predict_data2$m1 <- 6 - predict_data2$m1
 scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
 scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
 diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
