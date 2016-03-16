@@ -39,9 +39,9 @@ The following indicators related to fear and violence were measured in Honduras:
 - vicbar7: Murders in the Neighborhood (1=yes, 2=no) 
 - a4 == 5,14,27,30,57: Biggest problem related to crime/violence/security
 
-Note that `vic44` appears to be on topic, but turns out not to correlate strongly with this index; we won't include it.
+While `vic44` didn't correlate strongly in other countries, it seems to have a small but significant effect in Honduras, so I'm leaving it in.
 
-Also note that the values of `vic40`-`vic45` are different in Honduras than they are in Guatemala; we'll need to account for that when creating a regional index.
+Also note that the values of `vic40`-`vic45` are different in Honduras than they are in Guatemala. This doesn't affect the regional index because they weren't collected at all in El Salvador.
 
 ```{r,message=FALSE}
 library(ggplot2)

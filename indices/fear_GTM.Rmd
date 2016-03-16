@@ -39,10 +39,11 @@ The following indicators related to fear and violence were measured in Guatemala
 - vicbar3: Sales of Illegal Drugs in Neighborhood (1=yes, 2=no) 
 - vicbar4: Extortion or Blackmail in the Neighborhood (1=yes, 2=no)
 - vicbar7: Murders in the Neighborhood (1=yes, 2=no) 
+- a4 == 5,14,27,30,57: Biggest problem related to crime/violence/security
 
 Note that `vic44` appears to be on topic, but turns out not to correlate strongly with this index; we won't include it.
 
-Also note that the values of `vic40`-`vic45` are different in Guatemala than they are in Honduras; we'll need to account for that when creating a regional index.
+Also note that the values of `vic40`-`vic45` are different in Guatemala than they are in Honduras. This doesn't affect the regional index because they weren't collected at all in El Salvador.
 
 ```{r,message=FALSE}
 library(ggplot2)
@@ -268,4 +269,6 @@ sapply(bin_vars,function(x) bin_cor(my_data[,x]))
 ```
 
 All are highly significant.
+
+
 

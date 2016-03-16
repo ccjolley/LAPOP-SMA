@@ -65,7 +65,7 @@ fear_common <- c('fear10','vic1ext','vic1exta','vic1hogar','aoj11',
 
 # Using the old versions of GTM and SLV indices until I can evaluate new ones.
 fear_hnd <- make_idx(lapop.2014.HND,
-                     c(fear_common,'vic40','vic41','vic43','vic45','fear6f'))
+                     c(fear_common,'vic40','vic41','vic43','vic44','vic45','fear6f'))
 fear_gtm <- make_idx(lapop.2014.GTM,
                      c(fear_common,'vic40','vic41','vic43','fear6e','fear6f'),
                      sgn=-1)
