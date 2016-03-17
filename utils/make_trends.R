@@ -6,7 +6,8 @@ library(reshape2)
 library(RColorBrewer)
 library(stringi)
 
-setwd("C:/Users/Craig/Dropbox/SMA/VSFS")
+wd <- getwd()
+setwd("C:/Users/Craig/Desktop/SMA/VSFS")
 
 ###############################################################################
 # Data cleaning: Create a data frame called lapop.trends containing all 
@@ -116,66 +117,6 @@ rm(lapop.2004.GTM,lapop.2004.SLV,lapop.2004.HND,
    lapop.2014.GTM,lapop.2014.SLV,lapop.2014.HND,
    fnames,trend.all,yrs,intersection)
 
-setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
+setwd(wd)
+rm(wd)
 
-#TODO: lapop.trends really needs lat/long information.
-# Looks like 'pais' is the only geo indicator that has the same name every year.
-# prov: HND,SLV from 2008 on, GTM from 2010
-# GTM 2004 uses gprov, 2006 uses guadept, guamunicipio, 2008 uses provincia
-# To make matters worse, I can't count on the same numeric codes being
-# used every year, and I only have codebooks for 2014.
-
-# # Guatemala - departments
-# sort(unique(lapop.2004.GTM$gprov)) # numbered 1-22
-# sort(unique(lapop.2006.GTM$guadept)) # 11 is missing - questionnaire lists depts but not munis.
-# sort(unique(lapop.2008.GTM$provincia)) # numbered 201-222
-# sort(unique(lapop.2010.GTM$prov)) # same as 2008
-# sort(unique(lapop.2012.GTM$prov)) # same as 2008, missing 219
-# sort(unique(lapop.2010.GTM$prov)) # same as 2008
-# # Guatelama - municipalities
-# sort(unique(lapop.2004.GTM$gcant)) # 1-27, 50
-# sort(unique(lapop.2006.GTM$guamunicipio)) # 1-90
-# sort(unique(lapop.2008.GTM$municipio)) # 1-95
-# sort(unique(lapop.2010.GTM$municipio)) # 20101-22212
-# sort(unique(lapop.2012.GTM$municipio)) # 101-2211
-# sort(unique(lapop.2014.GTM$municipio)) # same as 2014
-# 
-# # El Salvador - departments
-# sort(unique(lapop.2004.SLV$edepa)) # 1-14
-# sort(unique(lapop.2006.SLV$elsdept)) # 1-14
-# sort(unique(lapop.2008.SLV$prov)) # 1-14
-# sort(unique(lapop.2010.SLV$prov)) # 1-14
-# sort(unique(lapop.2012.SLV$prov)) # 301-314
-# sort(unique(lapop.2014.SLV$prov)) # 301-314
-# # El Salvador - municipalities
-# sort(unique(lapop.2004.SLV$emuni)) # 1-65
-# sort(unique(lapop.2006.SLV$elsmunicipio)) # 1-66
-# sort(unique(lapop.2008.SLV$municipio)) # 1-66
-# sort(unique(lapop.2010.SLV$municipio)) # 1-66
-# sort(unique(lapop.2012.SLV$municipio)) # 3011-31416
-# sort(unique(lapop.2014.SLV$municipio)) # 30101-31416
-# 
-# # Honduras - departments
-# sort(unique(lapop.2004.HND$hdepa)) # 1-18
-# sort(unique(lapop.2006.HND$hondpt)) # 1-22
-# sort(unique(lapop.2008.HND$prov)) # 401-422
-# sort(unique(lapop.2010.HND$prov)) # 401-422
-# sort(unique(lapop.2012.HND$prov)) # 401-422, missing 414-417
-# sort(unique(lapop.2014.HND$prov)) # 401-422, missing 414-417
-# # Honduras - municipalities
-# sort(unique(lapop.2004.HND$hmuni)) # 1-26
-# sort(unique(lapop.2006.HND$honmunicipio)) # 101-2204
-# sort(unique(lapop.2008.HND$municipio)) # 101-2204
-# sort(unique(lapop.2010.HND$honmunicipio)) # 101-2204
-# sort(unique(lapop.2010.HND$municipio)) # 401-493
-# # Honduras - aldeas
-# sort(unique(lapop.2004.HND$hmuni2)) # 1-1810
-# sort(unique(lapop.2006.HND$hondistrito)) # 1-163
-# sort(unique(lapop.2008.HND$hondistrito)) # 1-163
-# sort(unique(lapop.2010.HND$hondistrito)) # 101001-2204163
-# sort(unique(lapop.2012.HND$hondistrito)) # 10101-180752
-# sort(unique(lapop.2014.HND$hondistrito)) # 10201-180752
-# 
-# # I can't guarantee any consistency across datasets here.
-# 
-# 

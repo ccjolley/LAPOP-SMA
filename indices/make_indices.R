@@ -4,11 +4,14 @@ library(mice)
 library(plyr)
 library(ggplot2)
 
+wd <- getwd()
+setwd("C:/Users/Craig/Desktop/SMA/VSFS")
+
 # Load data
 
-lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
-lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
-lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.HND <- read.csv("HND-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.GTM <- read.csv("GTM-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.SLV <- read.csv("SLV-2014.csv",stringsAsFactors=FALSE)
 # vic1exta asks about the frequency of crime victimization and is NR if 
 # respondant was never victimized; change this to zero
 lapop.2014.HND$vic1exta[lapop.2014.HND$vic1exta == 999999] <-  0
@@ -147,6 +150,8 @@ aut_all_data$dem2[aut_all_data$dem2==2] <- 1
 aut_all_data$dem2[aut_all_data$dem2==100] <- 2
 aut_all <- make_idx(aut_all_data,names(aut_all_data))
 
-# TODO: Clean up the variables that won't be needed by whatever other 
-# files call this one.
+rm(aut_all_data,aut_hnd_data,pv_data)
+
+setwd(wd)
+rm(wd)
 

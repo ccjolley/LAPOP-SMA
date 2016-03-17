@@ -1,0 +1,220 @@
+---
+title: "Wealth index"
+author: "Craig Jolley"
+date: "September 29, 2015"
+output: html_document
+---
+
+This is similar to the wealth index, but uses only the indicators that have been collected (and have consistent meanings) every year since 2004. This excludes income-based measures like `q10g` and `q10new`, so that we're only looking at the things that people own.
+
+- `r1`: Television in home (0 = No, 1 = Yes)
+- `r3`: Refrigerator in home
+- `r4`: Landline in home
+- `r4a`: Cell phone in home
+- `r5`: Number of vehicles owned (0 = None, 1 = one, 2 = two, 3 = three or more)
+- `r6`: Washing machine in home
+- `r7`: Microwave oven in home
+- `r12`: Drinking water in home
+- `r14`: Indoor bathroom in home
+- `r15`: Computer in home
+
+```{r, message=FALSE}
+library(ggplot2)
+library(mice)
+library(plyr) # nice for re-formatting data
+library(GGally) # for plot matrices
+
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
+source('../utils/make_trends.R')
+v <- c('r1','r3','r4','r4a','r5','r6','r7','r12','r14','r15')
+my_data <- lapop.trends[,v]
+# In 2004, some people answered "2" or "3" to r1; I'm not sure what this means. Maybe 
+# they have multiple TVs. Change these to 1.
+my_data[!is.na(my_data$r1) & my_data$r1>1,'r1'] <- 1
+```
+
+```round(100*(1 - nrow(na.omit(my_data))/nrow(my_data)),2)```% of rows contain missing values; overall ```round(100*sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data)),2)```% of values are missing. Although we have ```nrow(my_data)``` individual records, only ```nrow(unique(my_data))``` are actually unique.
+
+Test PCA with only the complete data:
+
+```{r}
+my_complete <- na.omit(my_data)
+pr_complete <- prcomp(my_complete,center=TRUE,scale=FALSE)
+plot(pr_complete)
+summary(pr_complete)
+```
+
+38% of the variance is in the first component.
+
+```{r,warning=FALSE}
+qplot(pr_complete$x[,1],pr_complete$x[,2]) +  theme_classic()
+```
+
+The distribution looks fairly well spread-out along PC1.
+
+```{r}
+my_imp <- mice(my_data,printFlag = F) 
+nmis <- my_imp$nmis
+nm <- data.frame(pmis=100*nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=pmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Percent imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
+```
+
+Overall, very little imputation was required.
+
+```{r}
+pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
+plot(pr[[1]])
+summary(pr[[1]])
+```
+
+Imputation changed the PCA very little; we still have 38% concentrated in the first component.
+
+```{r, fig.width=10, fig.height=10}
+all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
+names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+ggpairs(all_pc1) + theme_classic()
+```
+
+Correlations are all very high (as we'd expect given the small amount of imputation). The distribution is a little uneven, which we would expect given the limited number of unique responses.
+
+```{r,fig.height=5,fig.width=10}
+all_pc1$avg <- rowMeans(all_pc1)
+q25 <- quantile(all_pc1$avg)[2]
+q75 <- quantile(all_pc1$avg)[4]
+qchange <- data.frame(low=colMeans(my_data[all_pc1$avg <= q25,],na.rm=TRUE),
+                      hi=colMeans(my_data[all_pc1$avg >= q75,],na.rm=TRUE))
+qchange$slope <- qchange$hi - qchange$low
+qchange$label <- rownames(qchange)
+qchange$even <- rank(qchange$hi)/nrow(qchange)*max(c(qchange$low,qchange$hi))
+
+ggplot(data=qchange) +
+  geom_segment(aes(x=0,y=qchange$low,xend=1,yend=qchange$hi,
+                   color=qchange$slope),size=1) +
+  scale_color_gradient(low='#FF420E',high='#89DA59') +
+  geom_text(aes(x=1,y=0.5*(qchange$hi+qchange$even),label=qchange$label,
+                hjust=0,color=qchange$slope),size=5) +
+  annotate("text",x=0,y=0,label='Average in lowest quartile',hjust=0) +
+  annotate("text",x=1,y=0,label='Average in highest quartile',hjust=1) +
+  scale_x_continuous(limits=c(0,1.5)) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title=element_blank(),
+        text=element_text(size=20))
+```
+
+All variables increase as we go from the lowest to the highest quartile, so this is a valid measure of how much stuff people have. The steepest increases are for `r3` (refrigerator in home) and `r14` (indoor bathroom) -- these are things that wealthy people have and poor people don't. 
+
+```{r}
+all_pc1$norm <- scale(all_pc1$avg)
+predict_data <- data.frame(r1=c(0,1),r3=c(0,1),r4=c(0,1),r4a=c(0,1),r5=c(0,3),
+                           r6=c(0,1),r7=c(0,1),r12=c(0,1),r14=c(0,1),
+                           r15=c(0,1))
+minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
+minmax <- (minmax - mean(all_pc1$avg)) / sd(all_pc1$avg)
+wealth <- data.frame(w=all_pc1$norm) 
+ggplot(wealth,aes(x=w)) +
+  geom_density(fill='bisque2',linetype='blank') +
+  geom_segment(x=minmax[1],xend=minmax[1],y=0,yend=0.5,size=2,color='darkred') +
+  geom_segment(x=mean(wealth$w),xend=mean(wealth$w),y=0,yend=0.5,size=2,color='bisque4') +
+  geom_segment(x=minmax[2],xend=minmax[2],y=0,yend=0.5,size=2,color='darkolivegreen4') +
+  annotate('text',label=paste("Lowest:",round(minmax[1],2)),  
+           size=7,x=minmax[1]+0.05,y=0.4,hjust=0,vjust=0,color='darkred') +
+  annotate('text',label="Mean: 0",  
+           size=7,x=0.05,y=0.4,hjust=0,vjust=0,color='bisque4') +
+  annotate('text',label=paste("Highest:",round(minmax[2],2)),  
+           size=7,x=minmax[2]-0.05,y=0.4,hjust=1,vjust=0,color='darkolivegreen4') +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.line.y=element_blank()) 
+```
+
+Our data use the full range of possible wealth values, and tend to be somewhat bunched up at the low end.
+
+How much do individual variables affect this wealth index?
+
+```{r,warning=FALSE}
+predict_data2 <- data.frame(diag(10))
+names(predict_data2) <- names(predict_data)
+scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
+scores <- (scores - mean(all_pc1$avg)) / sd(all_pc1$avg)
+diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
+ggplot(diff,aes(x=n,y=d)) +
+  geom_bar(stat='identity',fill='skyblue') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank())
+```
+
+
+Having an indoor bathroom (`r14`) increases a person's wealth index more than having a cell phone (`r4a`) or a television (`r1`). Even poor people have cell phones and TVs, while indoor plumbing tends to show a large difference between rich and poor households. 
+
+Let's visualize this for microwave ovens (`r7`), with a logistic regression.
+
+```{r}
+r7 <- data.frame(r=my_data$r7,w=wealth$w)
+r7 <- na.omit(r7)
+my_glm <- glm(data=r7, r ~ w, family=binomial(logit))
+summary(my_glm)
+ggplot(r7,aes(x=w,y=r)) +
+  geom_jitter(color='tomato3',size=5,alpha=0.01,position=position_jitter(0.1,0.1)) +
+  theme_classic() +
+  stat_smooth(method="glm", family="binomial",size=2,color='royalblue',se=FALSE) +
+  ylab('r7') +
+  xlab('Wealth index') +
+  theme(text=element_text(size=20),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) 
+```
+
+We can test this more rigorously using 2-sample t-tests:
+
+```{r}
+bin_cor <- function(var) {
+  tt <- t.test(all_pc1$norm[var==min(var,na.rm=TRUE)],
+               all_pc1$norm[var>min(var,na.rm=TRUE)])
+  tt$p.value
+}
+
+sapply(v,function(x) bin_cor(my_data[,x]))
+```
+
+All are highly-significant. Both the logistic regression and the p-values look better than when we did this for the 2014 data only and included income information. To make that comparison more fair, we'll have to restrict to 2014 data only.
+
+```{r}
+my_2014 <- my_data[lapop.trends$year==2014,]
+pc1_2014 <- all_pc1[lapop.trends$year==2014,]
+bin_cor_2014 <- function(var) {
+  tt <- t.test(pc1_2014$norm[var==min(var,na.rm=TRUE)],
+               pc1_2014$norm[var>min(var,na.rm=TRUE)])
+  tt$p.value
+}
+sapply(v,function(x) bin_cor_2014(my_2014[,x]))
+
+source('make_indices.R')
+bin_cor_wall <- function(var) {
+  tt <- t.test(w_all[var==min(var,na.rm=TRUE)],
+               w_all[var>min(var,na.rm=TRUE)])
+  tt$p.value
+}
+sapply(v,function(x) bin_cor_wall(my_2014[,x]))
+```
+
+The predictive power of this index is dramatically higher, even when applied to a (possibly non-representative) subset of the data for which it was created. While assets and income are clearly correlated, they aren't equivalent measures of wealth. Given changes in currency exchange rates, comparing assets is probably a better way to gauge changes in wealth over time and across the three countries.
