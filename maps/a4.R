@@ -1,62 +1,26 @@
-# Find the most common response to question a4 in each department
+# Find the most common response to question a4 in each primary sampling unit
 
-lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
-lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
-lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
-source('make_geo.R')
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/maps")
+source('../utils/make_geo.R',encoding='utf-8')
 
 mydata <- data.frame(a4=c(a4=lapop.2014.GTM$a4,lapop.2014.SLV$a4,
                           lapop.2014.HND$a4))
-mydata <- cbind(mydata,my_geo[,c('pais_text','prov_text')])
+mydata <- cbind(mydata,my_geo[,c('estratopri')])
 mydata <- mydata[mydata$a4 < 888888,]
+names(mydata) <- c('a4','estratopri')
 
 mode_stat <- function(x) {
   df <- as.data.frame(table(x))
   as.numeric(df$x[which.max(df$Freq)])
 }
 
-mode_pval <- function(x) {
-  # return the p-value for the proportion test for the first and 
-  # second-most common values within x
-  df <- as.data.frame(table(x))
-  df <- df[order(df$Freq,decreasing=TRUE),]
-  f1 <- df$x[1]
-  f2 <- df$x[2]
-  m <- matrix(c(sum(x==f1),sum(x==f2),sum(x!=f1),sum(x!=f2)),nrow=2,ncol=2)
-  pt <- prop.test(m)
-  pt$p.value
-}
+res <- ddply(mydata,'estratopri',summarize,mode=mode_stat(a4))
+# modal response is always poverty (4) or crime (5)
+res[res$mode==4,'text'] <- 'Poverty'
+res[res$mode==5,'text'] <- 'Crime'
 
-mode2_stat <- function(x) {
-  # return the second-most-common response
-  df <- as.data.frame(table(x))
-  df <- df[order(df$Freq,decreasing=TRUE),]
-  as.numeric(df$x[2])
-}
-
-mode2_pval <- function(x) {
-  # return the p-value for the proportion test for the first two and 
-  # the third-most common values within x
-  df <- as.data.frame(table(x))
-  df <- df[order(df$Freq,decreasing=TRUE),]
-  f1 <- df$x[1]
-  f2 <- df$x[2]
-  f3 <- df$x[3]
-  m <- matrix(c(sum(x==f1 | x==f2),sum(x==f3),sum(x!=f1 & x!= f2),sum(x!=f3)),nrow=2,ncol=2)
-  pt <- prop.test(m)
-  pt$p.value
-}
+# ArcMap only wants to join on text fields
+res$estratopri <- as.character(res$estratopri) 
+write.csv(res,'a4.csv',row.names=FALSE)
 
 
-mydata$uniq_text <- paste(mydata$pais_text,mydata$prov_text,sep='_')
-res <- ddply(mydata,'uniq_text',summarize,mode=mode_stat(a4),pval=mode_pval(a4),
-      mode2=mode2_stat(a4),pval2=mode2_pval(a4))
-
-# for HND, I have 
-
-m <- mydata[match(res$uniq_text,mydata$uniq_text),c('pais_text','prov_text')]
-res2 <- cbind(res[,c('mode','pval','mode2','pval2')],m)
-hnd <- res2[res2$pais_text=='Honduras',]
-hnd[hnd$pval>0.01,]
-hnd[hnd$pval<0.01,]
-# more statistical ties than not
