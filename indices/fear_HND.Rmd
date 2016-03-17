@@ -344,3 +344,9 @@ ggplot(data=plotme,aes(x=log_p,y=est,color=est,label=var)) +
 ```
 
 So while many variables have a small influence, all of them correlate significantly (p < 0.01).
+
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
+```

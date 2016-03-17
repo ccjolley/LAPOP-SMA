@@ -50,16 +50,17 @@ library(ggplot2)
 library(mice)
 library(plyr)
 library(GGally)
-set.seed(12345)
 my_data <- lapop.2014.GTM[,c('vic40', 'vic41','vic43',
                              'fear10','fear6e','fear6f','vic1ext','vic1exta',
                              'vic1hogar','aoj11','pese1','pese2','aoj17',
                              'diso7','diso8','diso10','diso18','diso14',
                              'diso16','diso17','vicbar1','vicbar1f',
                              'vicbar3','vicbar4','vicbar7')]
+
 my_data[my_data$vic1exta > 800000,'vic1exta'] <- 0
 my_data$a4 <- as.numeric(lapop.2014.GTM$a4 %in% c(5,14,27,30,57))
 is.na(my_data[my_data>800000]) <- TRUE
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 
 my_complete <- na.omit(my_data)
 pr_complete <- prcomp(my_complete, center = TRUE, scale = FALSE)
@@ -71,7 +72,7 @@ summary(pr_complete)
 40% of total variance winds up in the first component.
 
 ```{r}
-my_imp <- mice(my_data, printFlag = F)
+my_imp <- mice(my_data, printFlag = F, seed=12345)
 my_imp
 ```
 
@@ -100,7 +101,7 @@ names(all_pc1) <- c('imp1', 'imp2', 'imp3', 'imp4', 'imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
 
-Correlations for different imputed datasets are about 0.997 â€“ imputation is consistent and distribution of PC1 looks well-behaved.
+Correlations for different imputed datasets are about 0.997 â€? imputation is consistent and distribution of PC1 looks well-behaved.
 
 ```{r,fig.height=8,fig.width=10}
 all_pc1$avg <- rowMeans(all_pc1)
@@ -270,5 +271,9 @@ sapply(bin_vars,function(x) bin_cor(my_data[,x]))
 
 All are highly significant.
 
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
 
+```{r}
+quantile(all_pc1$norm)
+```
 
