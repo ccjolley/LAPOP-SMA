@@ -223,4 +223,8 @@ bin_vars <- c('fear10','vic1ext','vic1hogar','vicbar1','vicbar3',
 sapply(bin_vars,function(x) bin_cor(my_data[,x]))
 ```
 
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
 
+```{r}
+quantile(all_pc1$norm)
+```

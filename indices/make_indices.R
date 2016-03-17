@@ -17,10 +17,14 @@ lapop.2014.SLV <- read.csv("SLV-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.HND$vic1exta[lapop.2014.HND$vic1exta == 999999] <-  0
 lapop.2014.GTM$vic1exta[lapop.2014.GTM$vic1exta == 999999] <- 0
 lapop.2014.SLV$vic1exta[lapop.2014.SLV$vic1exta == 999999] <- 0
+lapop.2014.GTM$a4_crime <- as.numeric(lapop.2014.GTM$a4 %in% c(5,14,27,30,57))
+lapop.2014.SLV$a4_crime <- as.numeric(lapop.2014.SLV$a4 %in% c(5,14,27,30,57))
+lapop.2014.HND$a4_crime <- as.numeric(lapop.2014.HND$a4 %in% c(5,14,27,30,57))
 common <- Reduce(intersect,list(names(lapop.2014.GTM),names(lapop.2014.SLV),
                                 names(lapop.2014.HND)))
 lapop.2014.all <- rbind(lapop.2014.GTM[,common],lapop.2014.SLV[,common],
                         lapop.2014.HND[,common])
+
 
 ###############################################################################
 ## Functions we need to construct indices
@@ -64,7 +68,7 @@ sanity_check <- function(data,idx,var) {
 fear_common <- c('fear10','vic1ext','vic1exta','vic1hogar','aoj11',
                  'pese1','pese2','aoj17','diso7','diso8','diso10','diso18',
                  'diso14','diso16','diso17','vicbar1','vicbar1f','vicbar3',
-                 'vicbar4','vicbar7')
+                 'vicbar4','vicbar7','a4_crime')
 
 # Using the old versions of GTM and SLV indices until I can evaluate new ones.
 fear_hnd <- make_idx(lapop.2014.HND,
@@ -74,7 +78,10 @@ fear_gtm <- make_idx(lapop.2014.GTM,
                      sgn=-1)
 fear_slv <- make_idx(lapop.2014.SLV,c(fear_common,'vicbar7f','elsdiso18',
                                       'elsdiso19'))
-fear_all <- make_idx(lapop.2014.all,fear_common)
+fear_all <- make_idx(lapop.2014.all,fear_common,sgn=-1)
+
+# to check against Rmd
+quantile(fear_all) # -1.6608376 -0.7775291 -0.1050923  0.7337169  2.6785860 
 # NOTE: in HND, vic40-vic45 take values of 1=yes and 2=no
 # in GTM, they take values of 0=no and 1=yes
 # This doesn't affect fear_all, since they aren't used at all in SLV; just
