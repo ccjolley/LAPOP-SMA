@@ -7,17 +7,17 @@ output: html_document
 
 I'm curious which of the variables in our trust in government index have historical information available, and how these vary over time.
 
-```{r}
-setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
-source('make_trends.R')
-source('make_indices.R')
+```{r, message=FALSE}
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/index_ts")
+source('../utils/make_trends.R')
+source('../indices/make_indices.R')
 tr_common_ts <- intersect(names(lapop.trends),tr_common)
 tr_ts_idx <- make_idx(lapop.trends,tr_common_ts,sgn=-1)
 ```
 
-The new index uses ```length(tr_common_ts)``` variables, rather than the previous ```length(tr_common)```, and is constructed using ```nrow(lapop.trends)``` observations rather than the previous ```nrow(lapop.2014.all)```. For the 2014 data (where both indices were calculated), how well do they agree?
+The new index uses `r length(tr_common_ts)` variables, rather than the previous `r length(tr_common)`, and is constructed using `r nrow(lapop.trends)` observations rather than the previous `r nrow(lapop.2014.all)`. For the 2014 data (where both indices were calculated), how well do they agree?
 
-```{r}
+```{r, warning=FALSE}
 df1 <- data.frame(idnum=lapop.trends$idnum,tr_ts=tr_ts_idx)
 # idnum isn't actually in there -- need to fix this
 df2 <- data.frame(idnum=lapop.2014.all$idnum,tr=tr_all)
@@ -41,6 +41,7 @@ plotme <- ddply(df3,.(year,pais),summarize,mean=mean(tr_idx),
       lo=t.test(tr_idx)$conf.int[1],hi=t.test(tr_idx)$conf.int[2])
 pais_text <- c('','Guatemala','El Salvador','Honduras')
 plotme$pais <- pais_text[plotme$pais]
+plotme <- na.omit(plotme)
 ggplot(plotme,aes(x=year,y=mean,group=pais,color=pais)) +
   geom_point(size=5) +
   geom_line(size=3) +
@@ -51,3 +52,5 @@ ggplot(plotme,aes(x=year,y=mean,group=pais,color=pais)) +
 ```
 
 It seems odd to me that trust in government spiked in Honduras in 2010, the year after a coup. Apparently people had high hopes for the Lobo administration.
+
+I'm not sure that `estratopri` labels will be consistent for files loaded the way I've done it here; if I want to drill down to more geographic resolution I should use LAPOP's "Grand Merge" dataset and subset out the Northern Triangle countries. It might be interesting to see time trends, especially for areas with low or decreasing levels of government trust.

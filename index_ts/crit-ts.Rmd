@@ -1,21 +1,21 @@
 ---
-title: "Wealth time series"
+title: "Political tolerance time series"
 author: "Craig Jolley"
 date: "January 27, 2016"
 output: html_document
 ---
 
-I'm curious which of the variables in our trust in government index have historical information available, and how these vary over time.
+I'm curious which of the variables in our political tolerance index have historical information available, and how these vary over time.
 
-```{r}
-setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
-source('make_trends.R')
-source('make_indices.R')
+```{r, message=FALSE}
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/index_ts")
+source('../utils/make_trends.R')
+source('../indices/make_indices.R')
 crit_common_ts <- intersect(names(lapop.trends),crit_common) # all of them!
 crit_ts_idx <- make_idx(lapop.trends,crit_common_ts,sgn=1)
 ```
 
-The new index uses ```length(crit_common_ts)``` variables, rather than the previous ```length(crit_common)```, and is constructed using ```nrow(lapop.trends)``` observations rather than the previous ```nrow(lapop.2014.all)```. For the 2014 data (where both indices were calculated), how well do they agree?
+The new index uses `r length(crit_common_ts)` variables, rather than the previous `r length(crit_common)`, and is constructed using `r nrow(lapop.trends)` observations rather than the previous `r nrow(lapop.2014.all)`. For the 2014 data (where both indices were calculated), how well do they agree?
 
 ```{r}
 df1 <- data.frame(idnum=lapop.trends$idnum,crit_ts=crit_ts_idx)
@@ -34,7 +34,7 @@ ggplot(data=j,aes(x=crit,y=crit_ts)) +
 
 Almost perfectly.
 
-```{r}
+```{r, warning=FALSE}
 df3 <- data.frame(year=lapop.trends$year,pais=lapop.trends$pais,crit_idx=crit_ts_idx)
 plotme <- ddply(df3,.(year,pais),summarize,mean=mean(crit_idx),
       lo=t.test(crit_idx)$conf.int[1],hi=t.test(crit_idx)$conf.int[2])
@@ -50,3 +50,5 @@ ggplot(plotme,aes(x=year,y=mean,group=pais,color=pais)) +
 ```
 
 The overall trend is downward, particularly in Guatemala.
+
+I'm not sure that `estratopri` labels will be consistent for files loaded the way I've done it here; if I want to drill down to more geographic resolution I should use LAPOP's "Grand Merge" dataset and subset out the Northern Triangle countries. It might be interesting to see time trends, especially for areas with low or decreasing levels of political tolerance.
