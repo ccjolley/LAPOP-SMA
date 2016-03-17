@@ -3,12 +3,15 @@
 library(ggmap)
 library(plyr)
 
+wd <- getwd()
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/utils")
+
 # No need to load these again, as long as this is called *after*
 # make_indices.R
 if (!exists(c('lapop.2014.GTM','lapop.2014.SLV','lapop.2014.HND'))) {
-  lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
-  lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
-  lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
+  lapop.2014.HND <- read.csv("../../HND-2014.csv",stringsAsFactors=FALSE)
+  lapop.2014.GTM <- read.csv("../../GTM-2014.csv",stringsAsFactors=FALSE)
+  lapop.2014.SLV <- read.csv("../../SLV-2014.csv",stringsAsFactors=FALSE)
 }
 geo <- c('pais','estratopri','estratosec','prov','municipio')
 my_geo <- rbind(lapop.2014.GTM[,geo],lapop.2014.SLV[,geo],
@@ -149,7 +152,7 @@ my_geo$dist_text <- dist_text[match(my_geo$hondistrito,dist_num)]
 rm(dist_num,dist_text)
 
 # Add lat/long information to my_geo. For Honduras, we'll extract that from the USGS aldeas data
-aldeas <- read.delim("../adelas.txt") # not my typo!
+aldeas <- read.delim("aldeas.txt") 
 ald2 <- aldeas[,c('Codigo','Nombre','Latitude','Longitude')]
 geo2 <- my_geo[,c('hondistrito','dist_text')]
 names(ald2) <- c('hondistrito','Nombre','Latitude','Longitude')
@@ -176,3 +179,5 @@ rm(uniq_loc,latlong,joined2)
 
 # Clean up my_geo to contain only the useful columns
 my_geo <- my_geo[,c(2,7:12)]
+
+setwd(wd)

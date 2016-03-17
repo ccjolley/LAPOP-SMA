@@ -1,4 +1,6 @@
 # Generate a couple of Excel spreadsheets with all the fear-related variables we could hope to map.
+# This version of the file is designed for maps to be created with interpolation between sampling
+# points.
 
 source('make_indices.R')
 source('make_geo.R')
