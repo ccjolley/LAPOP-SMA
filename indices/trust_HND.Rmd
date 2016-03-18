@@ -44,7 +44,6 @@ library(ggplot2)
 library(mice)
 library(plyr) # nice for re-formatting data
 library(GGally) # for plot matrices
-set.seed(12345) # makes imputation reproducible
 
 setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
 lapop.2014.HND <- read.csv("../../HND-2014.csv")
@@ -53,6 +52,7 @@ my_data <- lapop.2014.HND[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13',
                              'b15','b19','b46','honb51','venb11', 'venhonb51', 
                              'venhonvb10','epp1','epp3','n9','n11','n15',
                              'b3milx')]
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 ```
 
 Firstly, how many missing values do we have here?
@@ -79,8 +79,19 @@ summary(pr_complete)
 If we don't do any imputation, 39.9% of variance is contained in the first principal component; the others all appear to be much lower.
 
 ```{r}
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data,printFlag = F,seed=12345)
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
 Some variables stand out as needing more imputation that others:
@@ -210,3 +221,8 @@ ggplot(b37,aes(x=w,y=q)) +
   theme(text=element_text(size=20))
 ```
 
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
+```

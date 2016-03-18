@@ -17,6 +17,7 @@ lapop.2014.SLV <- read.csv("SLV-2014.csv",stringsAsFactors=FALSE)
 lapop.2014.HND$vic1exta[lapop.2014.HND$vic1exta > 800000] <-  0
 lapop.2014.GTM$vic1exta[lapop.2014.GTM$vic1exta > 800000] <- 0
 lapop.2014.SLV$vic1exta[lapop.2014.SLV$vic1exta > 800000] <- 0
+# Create a4_crime variable
 lapop.2014.GTM$a4_crime <- as.numeric(lapop.2014.GTM$a4 %in% c(5,14,27,30,57))
 lapop.2014.SLV$a4_crime <- as.numeric(lapop.2014.SLV$a4 %in% c(5,14,27,30,57))
 lapop.2014.HND$a4_crime <- as.numeric(lapop.2014.HND$a4 %in% c(5,14,27,30,57))
@@ -42,7 +43,7 @@ make_idx <- function(data,vars,sgn=1,scale=FALSE,seed=12345) {
   print(names(my_data))
   print(sum(my_data,na.rm=TRUE))
   my_imp <- mice(my_data,printFlag=F,seed=seed)
-  print(sum(complete(my_imp,1)))
+  print(sum(complete(my_imp,1))) # match
   my_pr <- lapply(1:5,function(x) 
     prcomp(complete(my_imp,x),scale=scale,center=TRUE))
   all_pc1 <- data.frame(llply(1:5, function(i) my_pr[[i]]$x[,1]))
@@ -51,6 +52,7 @@ make_idx <- function(data,vars,sgn=1,scale=FALSE,seed=12345) {
       all_pc1[,2] <- -1 * all_pc1[,2]
     }
   }
+  print(head(all_pc1)) # different
   avg <- rowMeans(all_pc1)
   scale(sgn*avg)
 }
@@ -120,9 +122,18 @@ sanity_check(lapop.2014.all,ca_all,'cp7')
 tr_common <- c('b1','b2','b3','b4','b6','b10a','b12','b13','b18','b21','b21a',
                'b32','b47a','n9','n11','n15','b3milx')
 
+# aoj18 has a funny scale that we'll have to fix; 
+# 1 = police protect against crime
+# 2 = police participate in crime
+# 3 = neither or both
+lapop.2014.SLV$aoj18_mod <- lapop.2014.SLV$aoj18
+lapop.2014.SLV[lapop.2014.SLV$aoj18==2,'aoj18_mod'] <- 3
+lapop.2014.SLV[lapop.2014.SLV$aoj18==3,'aoj18_mod'] <- 2
+
 tr_gtm <- make_idx(lapop.2014.GTM,c(tr_common,'pr4','m1'))
 tr_slv <- make_idx(lapop.2014.SLV,c(tr_common,'b11','esb48','epp1','epp3','pr4',
-                                    'epn3a','epn3b','epn3c','aoj18'))
+                                    'epn3a','epn3b','epn3c','aoj18_mod'),
+                   scale=TRUE)
 tr_hnd <- make_idx(lapop.2014.HND,c(tr_common,'b11','b37','b14','b15','b19',
                                     'b46','honb51','venb11','venhonb51',
                                     'venhonvb10','epp1','epp3'),
@@ -130,7 +141,7 @@ tr_hnd <- make_idx(lapop.2014.HND,c(tr_common,'b11','b37','b14','b15','b19',
 tr_all <- make_idx(lapop.2014.all,tr_common)
 
 quantile(tr_gtm) # -2.44517711 -0.72199661 -0.03433949  0.62477781  3.18774069 
-quantile(tr_slv) # -2.67290171 -0.71403085  0.04851013  0.73589602  2.38045355 
+quantile(tr_slv) # -2.73126419 -0.70139615  0.04380798  0.73484677  2.54899431
 quantile(tr_hnd) # -2.45365500 -0.70820950  0.06972997  0.73113641  2.62630907 
 quantile(tr_all) # -2.5103722094 -0.6908681253  0.0005998971  0.7143599120  2.6595092646
 

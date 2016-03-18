@@ -28,12 +28,11 @@ The following is a proposal for a Trust in Government Index, for which the follo
 * `m1`: Presidential Job Performance (1=Very Good, 5=Very Bad)
 
 
-```{r}
+```{r,message=FALSE}
 library(ggplot2)
 library(mice)
 library(plyr) 
 library(GGally) 
-set.seed(12345) 
 
 setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
 lapop.2014.GTM <- read.csv('../../2014-GTM.csv')
@@ -41,6 +40,7 @@ my_data <- lapop.2014.GTM[,c('b1','b2','b3','b4','b6','b10a','b12','b13','b18',
                              'b21','b21a','b32', 'b47a','n9','n11','n15',
                              'b3milx','pr4','m1')]
 is.na(my_data[my_data>16]) <- TRUE
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 nrow(na.omit(my_data))
 ```
 
@@ -62,9 +62,21 @@ summary(pr_complete)
 Without imputation, 38% of variance is concentrated in the first principal component.
 
 ```{r}
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data,printFlag = F, seed=12345) 
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
+
 A few variables stand out as needing some imputation; `b3`(Respect for Basic Rights) and `b6` (Support for Political System), in particular. In general, though, not much imputation was required.
 
 ```{r}
@@ -191,4 +203,10 @@ ggplot(b2,aes(x=w,y=q)) +
   ylab('m1') +
   xlab('Composite index') +
   theme(text=element_text(size=20))
+```
+
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
 ```

@@ -39,6 +39,7 @@ lapop.2014.HND <- read.csv('../../2014-HND.csv')
 v <- c('b1','b2','b3','b4','b6','b10a','b12','b13','b18','b21','b21a','b32',
        'b47a','n9','n11','n15','b3milx')
 my_data <- rbind(lapop.2014.GTM[,v],lapop.2014.SLV[,v],lapop.2014.HND[,v])
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 is.na(my_data[my_data>16]) <- TRUE
 ```
 
@@ -54,8 +55,19 @@ summary(pr_complete)
 Without imputation, 40% of variance is concentrated in the first principal component.
 
 ```{r}
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data,printFlag = F,seed=12345)
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
 None of the variables stand out as needing really dramatic levels of imputation.
@@ -168,4 +180,10 @@ ggplot(b2,aes(x=w,y=q)) +
   ylab('b2') +
   xlab('Composite index') +
   theme(text=element_text(size=20))
+```
+
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
 ```

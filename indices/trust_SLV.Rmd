@@ -40,12 +40,11 @@ As is to be expected with a LAPOP study, there are questions that were adapted t
 * `pr4`- reflecting confidence in the government's role in society
 
 
-```{r}
+```{r, message=FALSE}
 library(ggplot2)
 library(mice)
 library(plyr) 
 library(GGally) 
-set.seed(12345) 
 
 setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
 lapop.2014.SLV <- read.csv('../../2014-SLV.csv')
@@ -53,19 +52,27 @@ lapop.2014.SLV <- read.csv('../../2014-SLV.csv')
 my_data <- lapop.2014.SLV[,c('b1','b2','b3','b4','b6','b10a','b11','b12','b13',
                              'b18','b21','b21a','b32', 'b47a','esb48','n9',
                              'n11','n15','epp1','epp3','b3milx','pr4','epn3a',
-                             'epn3b','epn3c')]
+                             'epn3b','epn3c','aoj18')]
+
+# aoj18 has a funny scale that we'll have to fix; 
+# 1 = police protect against crime
+# 2 = police participate in crime
+# 3 = neither or both
+my_data[lapop.2014.SLV$aoj18==2,'aoj18'] <- 3
+my_data[lapop.2014.SLV$aoj18==3,'aoj18'] <- 2
 
 is.na(my_data[my_data>16]) <- TRUE
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 nrow(na.omit(my_data))
 ```
 
-With missing values, we are left with 1,354 rows.
+With missing values, we are left with 1,198 rows.
 
 ```{r}
 sum(is.na(my_data)) / (nrow(my_data)*ncol(my_data))
 ```
 
-Around 1% of missing values.
+Around 1.2% of missing values.
 
 ```{r}
 my_complete <- na.omit(my_data)
@@ -74,14 +81,25 @@ plot(pr_complete)
 summary(pr_complete)
 ```
 
-Without any imputation, about 37% of my variance is concentrated in my first principle component.
+Without any imputation, about 36% of my variance is concentrated in my first principal component.
 
 ```{r}
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data,printFlag = F,seed=12345) 
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
-None of the variables seems to stand out as needing much imputation, with the exception of, perhaps, `esb48`. Again, it is most likely that the Institute of Access to Public Information is not that well-known.
+None of the variables seems to stand out as needing much imputation, with the exception of `aoj18`. The question of whether the police protect from crime or cause it was a hard one for some to answer.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=TRUE,center=TRUE))
@@ -89,7 +107,7 @@ plot(pr[[1]])
 summary(pr[[1]])
 ```
 
-Following the imputation, not much has changed. 36.75% of variance is concentrated on the first principle component.
+Following the imputation, not much has changed. 36.75% of variance is concentrated on the first principal component.
 
 ```{r}
 pc1 <- pr[[1]]$x[,1]
@@ -134,7 +152,7 @@ ggplot(data=qchange) +
         text=element_text(size=20))
 ```
 
-All variables increase with PC1, except for `epn3a` through `epn3c`. For most variables, higher values indicate a higher level of trust in government, while the opposite is true for the `epn` variables. our index is pointing in the right direction.
+All variables increase with PC1, except for `epn3a` through `epn3c`. For most variables, higher values indicate a higher level of trust in government, while the opposite is true for the `epn` variables and `aoj18`. Our index is pointing in the right direction.
 
 ```{r}
 all_pc1$norm <- scale(all_pc1$avg) 
@@ -144,12 +162,12 @@ predict_data <- data.frame(b1=c(1,7),b2=c(1,7),b3=c(1,7),b4=c(1,7),
                            b32=c(1,7),b47a=c(1,7),esb48=c(1,7),
                            n9=c(1,7), n11=c(1,7), n15=c(1,7),epp1=c(1,7), 
                            epp3=c(1,7),b3milx=c(1,7), pr4=c(1,7), epn3a=c(4,1), 
-                           epn3b=c(4,1),epn3c=c(4,1))
+                           epn3b=c(4,1),epn3c=c(4,1),aoj18=c(3,1))
 minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
 minmax <- (minmax-mean(all_pc1$avg)) / sd(all_pc1$avg) 
 # compares well with quantile(all_pc1$norm)
 
-predict_data2 <- data.frame(diag(25)+1)
+predict_data2 <- data.frame(diag(26)+1)
 names(predict_data2) <- names(my_data)
 predict_data2$epn3a <- 5 - predict_data2$epn3a
 predict_data2$epn3b <- 5 - predict_data2$epn3b
@@ -179,7 +197,7 @@ lmp <- function (modelobject) {
     attributes(p) <- NULL
     return(p)
 }
-sapply(c('b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
+sapply(c('aoj18','b1','b2','b3', 'b4','b6','b10a','b11','b12','b13',
                              'b18','b21','b21a','b32', 'b47a','esb48','n9','n11','n15', 'epp1', 'epp3', 'b3milx', 'pr4', 'epn3a', 'epn3b','epn3c'),
        function(x) lmp(lm(all_pc1$norm ~ my_data[,x])))
 ```
@@ -217,4 +235,10 @@ ggplot(epn3a,aes(x=w,y=q)) +
   ylab('epn3a') +
   xlab('Composite index') +
   theme(text=element_text(size=20))
+```
+
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
 ```
