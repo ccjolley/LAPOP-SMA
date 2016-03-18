@@ -48,7 +48,6 @@ library(ggplot2)
 library(mice)
 library(plyr)
 library(GGally)
-set.seed(12345) 
 my_data <- lapop.2014.HND[,c('vic40', 'vic41', 'vic44', 'vic43','vic45',
                              'fear10','fear6f','vic1ext','vic1exta',
                              'vic1hogar','aoj11','pese1','pese2','aoj17',
@@ -72,7 +71,7 @@ df$pc <- 1:nrow(df)
 44% of total variance winds up in the first component.
 
 ```{r}
-my_imp <- mice(my_data, printFlag = F)
+my_imp <- mice(my_data, printFlag = F,seed=12345)
 nmis <- my_imp$nmis
 nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
 ggplot(nm,aes(x=var,y=nmis)) +

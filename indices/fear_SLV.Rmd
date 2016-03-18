@@ -41,7 +41,6 @@ library(ggplot2)
 library(mice)
 library(plyr)
 library(GGally)
-set.seed(12345)
 my_data <- lapop.2014.SLV[,c('fear10','vic1ext','vic1exta',
                              'vic1hogar','aoj11','pese1','pese2','aoj17',
                              'diso7','diso8','diso10','diso18','diso14',
@@ -62,8 +61,19 @@ summary(pr_complete)
 38% of total variance winds up in the first component.
 
 ```{r}
-my_imp <- mice(my_data, printFlag = F)
-my_imp
+my_imp <- mice(my_data, printFlag = F,seed=12345)
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
 The only variable that needed a lot of imputation was `vicbar7f` -- the number of murders in the neighborhood. Let's look at the PCA for one of our imputed datasets.

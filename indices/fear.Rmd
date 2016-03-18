@@ -35,7 +35,6 @@ library(ggplot2)
 library(mice)
 library(plyr)
 library(GGally)
-set.seed(12345)
 
 setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
 lapop.2014.GTM <- read.csv("../../GTM-2014.csv")
@@ -48,6 +47,7 @@ my_data <- rbind(lapop.2014.GTM[,v],lapop.2014.SLV[,v],lapop.2014.HND[,v])
 my_data[my_data$vic1exta > 800000,'vic1exta'] <- 0
 my_data$a4 <- as.numeric(my_data$a4 %in% c(5,14,27,30,57))
 is.na(my_data[my_data>800000]) <- TRUE
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 
 my_complete <- na.omit(my_data)
 pr_complete <- prcomp(my_complete, center = TRUE, scale = FALSE)
@@ -58,11 +58,22 @@ summary(pr_complete)
 41.3% of total variance winds up in the first component.
 
 ```{r}
-my_imp <- mice(my_data, printFlag = F)
-my_imp
+my_imp <- mice(my_data, printFlag = F,seed=12345)
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
-The only variable that needed a lot of imputation was `vicbar7f` -- the number of murders in the neighborhood. Let's look at the PCA for one of our imputed datasets.
+The only variable that needed a lot of imputation was `vicbar1f` -- the number of burglaries in the neighborhood. I'm guessing this is because people don't always know about all the burglaries that might be going on. Let's look at the PCA for one of our imputed datasets.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -183,8 +194,9 @@ ggplot(diff, aes(x=n,y=d)) +
 
 All variables seem to have an effect, with a somewhat smaller one for `fear10` (avoided walking through dangerous areas), and larger ones for the `diso` variables and `vic1exta` (frequency of victimization)
 
-```{r}
+```{r,warning=FALSE,message=FALSE}
 fear10 <- data.frame(q=my_data$fear10,w=fear$w)
+fear10 <- na.omit(fear10)
 my_lm <- lm(data=fear10, q ~ w)
 ggplot(fear10,aes(x=w,y=q)) +
   geom_jitter(color='tomato3',size=5,alpha=0.2) +
