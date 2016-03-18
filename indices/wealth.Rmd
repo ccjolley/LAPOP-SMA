@@ -43,6 +43,7 @@ lapop.2014.HND <- read.csv('../../2014-HND.csv')
 v <- c('r3','r4','r4a','r5','r6','r7','r8','r12','r14','r15','r18','r1','r16',
        'r26','q10new','q10g')
 my_data <- rbind(lapop.2014.GTM[,v],lapop.2014.SLV[,v],lapop.2014.HND[,v])
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 ```
 
 We need to do something with missing values. It will be easier to work with them if we change them to NAs:
@@ -83,8 +84,19 @@ Now let's try imputing those missing values.
 There are a few different multiple imputation schemes available in R, but it's hard to find a good explanation of them. [This one](http://pj.freefaculty.org/guides/Rcourse/multipleImputation/multipleImputation-1-lecture.pdf) is OK, for being a really long powerpoint. I'll try doing this using the `mice` package (Multivariate Imputation by Chained Equations) and see how it does. More about MICE [here](http://www.stefvanbuuren.nl/mi/MICE.html).
 
 ```{r}
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data,printFlag = F,seed=12345) 
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
 There's a lot going on in the output here. MICE generated 5 different imputed data sets, so that we can run the same analyses on each and see how they compare. Some columns have a lot more missing cells than others -- everybody knows whether they have a washing machine (`r6`), but flat-panel TVs (`r16`) caused some confusion, and a lot of people didn't disclose their personal income (`q10g`). The PredictorMatrix at the bottom shows which variables were used to predict others. Except for `r6` and `r15`, which didn't need predicting at all, it looks like everything was used to predict everything else. 
@@ -294,3 +306,9 @@ sapply(bin_vars,function(x) bin_cor(my_data[,x]))
 ```
 
 All of our p-values on logistic regressions are highly significant, meaning that our wealth index has a strong influence on all of these wealth-related variables. This is what we would expect! Notice that the smallest p-values (i.e. the highest significance) are for variables like `r14` and `r18` where the influence on the wealth index was higher. This is also what we would expect; variables like `r8` are still significant but not as strong.
+
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
+```
