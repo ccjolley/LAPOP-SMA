@@ -35,6 +35,7 @@ my_data <- rbind(lapop.2014.GTM[,v],lapop.2014.SLV[,v],lapop.2014.HND[,v])
 my_data$dem2[my_data$dem2==1] <- 100
 my_data$dem2[my_data$dem2==2] <- 1
 my_data$dem2[my_data$dem2==100] <- 2
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 is.na(my_data[my_data>16]) <- TRUE
 ```
 
@@ -50,9 +51,19 @@ summary(pr_complete)
 41% of variance is concentrated in the first component.
 
 ```{r}
-set.seed(12345)
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data, printFlag = F,seed=12345)
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
 Most variables had fairly similar numbers of missing values; people were least willing to talk about expanded presidential powers (`jc15a`) and most willing to talk about mano dura policies (`dem11`).
@@ -78,6 +89,12 @@ The distribution of PC1 seems to fall into three bands, suggesting that the inde
 ```{r, fig.width=10, fig.height=10}
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+# make sure all correlations are positive
+for (i in 2:ncol(all_pc1)) {  
+  if (cor(all_pc1[,1],all_pc1[,2]) < 0) {
+    all_pc1[,2] <- -1 * all_pc1[,2]
+  }
+}
 ggpairs(all_pc1) + theme_classic()
 ```
 
@@ -171,3 +188,9 @@ ldply(bin_vars,bin_cor)
 ```
 
 All are significantly-correlated (especially `dem2`).
+
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
+```

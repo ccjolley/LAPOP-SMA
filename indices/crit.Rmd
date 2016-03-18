@@ -34,6 +34,7 @@ lapop.2014.SLV <- read.csv('../../2014-SLV.csv')
 lapop.2014.HND <- read.csv('../../2014-HND.csv')
 v <- c('d1','d2','d3','d4','e5','e15','e3','e16')
 my_data <- rbind(lapop.2014.GTM[,v],lapop.2014.SLV[,v],lapop.2014.HND[,v])
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 is.na(my_data[my_data>16]) <- TRUE
 ```
 
@@ -49,9 +50,19 @@ summary(pr_complete)
 38% of variance is in the first principal component -- pretty typical for our composite indices.
 
 ```{r}
-set.seed(12345)
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data,printFlag = F,seed=12345)
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
 None of these involved a lot of imputation; in general the questions about the political rights of government critics (`d1`,`d2`,`d3`,`d4`) needed more imputation than the questions about the appropriateness of protests or anti-government activity. 
@@ -176,3 +187,9 @@ ggplot(e16,aes(x=w,y=q)) +
 ```
 
 The correlation is far from perfect, but people with a high value of our index are significantly more likely to appove of vigilante justice. It's interesting that `e16` seems fairly polarized, with a lot of people answering either 1 or 10.
+
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
+```

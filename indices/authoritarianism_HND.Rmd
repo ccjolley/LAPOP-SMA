@@ -36,6 +36,7 @@ my_data <- lapop.2014.HND[,c('dem2','dem11','aut1','jc13','jc10','jc15a',
 my_data$dem2[my_data$dem2==1] <- 100
 my_data$dem2[my_data$dem2==2] <- 1
 my_data$dem2[my_data$dem2==100] <- 2
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 is.na(my_data[my_data>16]) <- TRUE
 ```
 
@@ -51,9 +52,19 @@ summary(pr_complete)
 34% of variance is concentrated in the first component.
 
 ```{r}
-set.seed(12345)
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data, printFlag = F,seed=12345)
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
 Most variables had fairly similar numbers of missing values; people were least willing to talk about coups and similar topics (`jc10`,`jc15a`,`jc16a`) and most willing to talk about mano dura policies.
@@ -79,10 +90,16 @@ The distribution of PC1 seems to fall into three bands, suggesting that the inde
 ```{r, fig.width=10, fig.height=10}
 all_pc1 <- data.frame(llply(1:5, function(i) pr[[i]]$x[,1]))
 names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
+# make sure correlations are all positive
+for (i in 2:ncol(all_pc1)) {  
+  if (cor(all_pc1[,1],all_pc1[,i]) < 0) {
+    all_pc1[,i] <- -1 * all_pc1[,i]
+  }
+}
 ggpairs(all_pc1) + theme_classic()
 ```
 
-All of our imputations are really well-correlated, and the highest-valued band is the most heavily-populated one.
+All of our imputations are really well-correlated, and the lowest-valued band is the most heavily-populated one.
 
 ```{r, fig.width=10, fig.height=5}
 all_pc1$avg <- rowMeans(all_pc1)
@@ -111,14 +128,14 @@ ggplot(data=qchange) +
         text=element_text(size=20))
 ```
 
-What are we seeing here? Compared to the lowest quantile, the highest quantile of our proposed index has much lower values for `dem2` and increasing values for everything else. Recall that lower values for `dem2` indicate a preference for democracy, while higher values of the binary variables indicate less-authoritarian attitudes. Our scale in pointing in the wrong direction and needs to be reversed.
+What are we seeing here? Compared to the lowest quantile, the highest quantile of our proposed index has much higher values for `dem2` and decreasing values for everything else. Recall that lower values for `dem2` indicate a preference for democracy, while higher values of the binary variables indicate less-authoritarian attitudes. Our scale in pointing in the wrong direction and needs to be reversed.
 
 Also note that `dem2` is the only variable that takes on three values; its strong slope in this plot suggests that it is the dominant factor in our index.
 
-Let's invert, normalize and average PC1:
+Let's normalize and average PC1:
 
 ```{r}
-all_pc1$norm <- scale(-all_pc1$avg)
+all_pc1$norm <- scale(all_pc1$avg)
 ```
 
 To confirm our suspicions about `dem2`, let's see how all variables contribute to the composite score.
@@ -130,7 +147,7 @@ predict_data <- data.frame(dem2=c(1,3),dem11=c(2,1),aut1=c(2,1),jc13=c(2,1),
 # The first row of predict_data should be the least-authoritarian response
 # possible, while the second is the most-authoritarian.
 minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
-minmax <- -(minmax-mean(all_pc1$avg)) / sd(all_pc1$avg)
+minmax <- (minmax-mean(all_pc1$avg)) / sd(all_pc1$avg)
 # should match quantile(all_pc1$norm)
 
 predict_data2 <- data.frame(2-diag(8))
@@ -138,7 +155,7 @@ names(predict_data2) <- names(my_data)
 predict_data2[,'dem2'] <- 3 - predict_data2[,'dem2']
 scores <- rowMeans(sapply(1:5, function(i) 
   predict(pr[[i]],predict_data2)[,1]))
-scores <- -(scores-mean(all_pc1$avg)) / sd(all_pc1$avg)
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg)
 diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
 ggplot(diff,aes(x=n,y=d)) +
   geom_bar(stat='identity',fill='skyblue') +
@@ -149,7 +166,7 @@ ggplot(diff,aes(x=n,y=d)) +
         axis.title.x=element_blank())
 ```
 
-While all eight variables have an impact on the composite index, `dem2` has by far the strongest influence.
+While all eight variables have an impact on the composite index, `aut1` has by far the strongest influence.
 
 We can be more rigorous about this by calculating p-values. We'll have to do this differently for `dem2` (which takes on three values) than for the ones that only take on two. 
 
@@ -175,3 +192,9 @@ ldply(bin_vars,bin_cor)
 ```
 
 All are significantly-correlated (especially `dem2`); the weakest correlation is with `honjc17`.
+
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
+```

@@ -47,9 +47,9 @@ make_idx <- function(data,vars,sgn=1,scale=FALSE,seed=12345) {
   my_pr <- lapply(1:5,function(x) 
     prcomp(complete(my_imp,x),scale=scale,center=TRUE))
   all_pc1 <- data.frame(llply(1:5, function(i) my_pr[[i]]$x[,1]))
-  for (i in 2:ncol(all_pc1)) {  # This isn't quite right yet.
-    if (cor(all_pc1[,1],all_pc1[,2]) < 0) {
-      all_pc1[,2] <- -1 * all_pc1[,2]
+  for (i in 2:ncol(all_pc1)) {  
+    if (cor(all_pc1[,1],all_pc1[,i]) < 0) {
+      all_pc1[,i] <- -1 * all_pc1[,i]
     }
   }
   print(head(all_pc1)) # different
@@ -169,7 +169,7 @@ crit_all <- make_idx(lapop.2014.all,crit_common)
 crit_hnd <- make_idx(lapop.2014.HND,crit_common)
 
 quantile(crit_hnd) # -1.9932752 -0.6620249 -0.1337136  0.5735625  2.7728628 
-quantile(crit_all) # -1.8595760 -0.6803297 -0.0801730  0.5911112  3.1651646 
+quantile(crit_all) # -1.85639766 -0.67782627 -0.08657864  0.59050048  3.16057937 
 
 # Authoritarianism
 # dem2 has a strange scale; switch 1 and 2
@@ -185,8 +185,8 @@ aut_all_data$dem2[aut_all_data$dem2==2] <- 1
 aut_all_data$dem2[aut_all_data$dem2==100] <- 2
 aut_all <- make_idx(aut_all_data,names(aut_all_data))
 
-quantile(aut_hnd) # -1.5323127 -0.6685949 -0.5160627  0.6448696  2.4573383 
-quantile(aut_all) # -0.8249519 -0.8249519 -0.3775576  0.1469249  2.7204588 
+quantile(aut_hnd) # -0.8421395 -0.6693930 -0.5117609  0.6109087  2.4775991 
+quantile(aut_all) # -0.8249519 -0.8249519 -0.3775576  0.1469249  2.7204588
 
 rm(aut_all_data,aut_hnd_data)
 
