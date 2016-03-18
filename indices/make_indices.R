@@ -80,15 +80,15 @@ fear_gtm <- make_idx(lapop.2014.GTM,
                      c(fear_common,'vic40','vic41','vic43','fear6e','fear6f'),
                      sgn=-1)
 fear_slv <- make_idx(lapop.2014.SLV,c(fear_common,'vicbar7f','elsdiso18',
-                                      'elsdiso19'))
+                                      'elsdiso19'),sgn=-1)
 fear_all <- make_idx(lapop.2014.all,fear_common,sgn=-1)
 
 # to check against Rmd
 quantile(fear_gtm) # -2.14888741 -0.78978002 -0.07731749  0.70524297  2.36829420
   # Matches now! I think alphabetizing columns is the trick.
-quantile(fear_slv) # -2.4255147 -0.7439393  0.2250576  0.8672222  1.3717990
-quantile(fear_hnd) # -1.66588165 -0.77158502 -0.09221246  0.73894377  2.33504904 
-quantile(fear_all) # -1.6608376 -0.7775291 -0.1050923  0.7337169  2.6785860 
+quantile(fear_slv) # -1.6617010 -0.8657568 -0.2116029  0.7632114  2.4428460
+quantile(fear_hnd) # -1.66495546 -0.78420207 -0.09084414  0.74054566  2.33662394  
+quantile(fear_all) # -1.6687644 -0.7750963 -0.1055477  0.7350126  2.6638733 
 # NOTE: in HND, vic40-vic45 take values of 1=yes and 2=no
 # in GTM, they take values of 0=no and 1=yes
 # This doesn't affect fear_all, since they aren't used at all in SLV; just
@@ -100,12 +100,12 @@ quantile(fear_all) # -1.6608376 -0.7775291 -0.1050923  0.7337169  2.6785860
 
 ca_hnd <- make_idx(lapop.2014.HND,
                    c('cp5','cp7','cp8','cp13','cp20','honcp22','honcp21a'),
-                   sgn=-1)
+                   sgn=1)
 ca_all <- make_idx(lapop.2014.all,
-                   c('cp5','cp7','cp8','cp13','cp20'),sgn=-1)
+                   c('cp5','cp7','cp8','cp13','cp20'),sgn=1)
 
-quantile(ca_hnd) # -1.14290897 -0.99492463 -0.01207018  0.63880845  3.65247987
-quantile(ca_all) # -1.07260590 -1.07260590 -0.07234828  0.64277874  4.54171286
+quantile(ca_hnd) # -1.187014097 -0.956660605 -0.009779228  0.637884956  3.669760977 
+quantile(ca_all) # -1.07551709 -1.02637075 -0.07517033  0.66139991  4.55413689 
 
 sanity_check(lapop.2014.all,ca_all,'cp7')
 
@@ -124,13 +124,13 @@ tr_hnd <- make_idx(lapop.2014.HND,c(tr_common,'b11','b37','b14','b15','b19',
                    sgn=-1)
 tr_all <- make_idx(lapop.2014.all,tr_common)
 
-quantile(tr_gtm) # -2.44553627 -0.72324479 -0.02216059  0.62380635  3.18560282 
-quantile(tr_slv) # -2.67211315 -0.71554799  0.04876564  0.73486784  2.37850474 
-quantile(tr_hnd) # -2.45318633 -0.70541786  0.07036517  0.73259629  2.62750647 
-quantile(tr_all) # -2.512089600 -0.689765926  0.001178898  0.711058934  2.661667054 
+quantile(tr_gtm) # -2.44517711 -0.72199661 -0.03433949  0.62477781  3.18774069 
+quantile(tr_slv) # -2.67290171 -0.71403085  0.04851013  0.73589602  2.38045355 
+quantile(tr_hnd) # -2.45365500 -0.70820950  0.06972997  0.73113641  2.62630907 
+quantile(tr_all) # -2.5103722094 -0.6908681253  0.0005998971  0.7143599120  2.6595092646
 
 ###############################################################################
-## Wealth index (double-check GTM and SLV)
+## Wealth index 
 ###############################################################################
 
 w_common <- c('r3','r4','r4a','r5','r6','r7','r8','r12','r14',
@@ -141,7 +141,7 @@ w_slv <- make_idx(lapop.2014.SLV,w_common,sgn=-1)
 w_hnd <- make_idx(lapop.2014.HND,c(w_common,'inf3a'),sgn=-1)
 w_all <- make_idx(lapop.2014.all,w_common)
 
-quantile(w_all) # -1.6172663 -0.8536973 -0.1241953  0.7724027  2.3960571
+quantile(w_all) # -1.6108186 -0.8521016 -0.1225483  0.7726567  2.3916136 
 
 ###############################################################################
 ## Authoritarianism indices 
@@ -162,15 +162,15 @@ aut_hnd_data <- lapop.2014.HND[c('dem2','dem11','aut1','jc13','jc10','jc15a',
 aut_hnd_data$dem2[aut_hnd_data$dem2==1] <- 100
 aut_hnd_data$dem2[aut_hnd_data$dem2==2] <- 1
 aut_hnd_data$dem2[aut_hnd_data$dem2==100] <- 2
-aut_hnd <- make_idx(aut_hnd_data,names(aut_hnd_data),sgn=-1)
+aut_hnd <- make_idx(aut_hnd_data,names(aut_hnd_data),sgn=1)
 aut_all_data <- lapop.2014.all[c('dem2','dem11','jc13','jc10','jc15a')]
 aut_all_data$dem2[aut_all_data$dem2==1] <- 100
 aut_all_data$dem2[aut_all_data$dem2==2] <- 1
 aut_all_data$dem2[aut_all_data$dem2==100] <- 2
 aut_all <- make_idx(aut_all_data,names(aut_all_data))
 
-quantile(aut_hnd) # -0.8342319 -0.6643032 -0.5259309  0.6231532  2.4549984 
-quantile(aut_all) # -0.8273806 -0.8273806 -0.3848952  0.1674678  2.7327082 
+quantile(aut_hnd) # -1.5323127 -0.6685949 -0.5160627  0.6448696  2.4573383 
+quantile(aut_all) # -0.8249519 -0.8249519 -0.3775576  0.1469249  2.7204588 
 
 rm(aut_all_data,aut_hnd_data)
 

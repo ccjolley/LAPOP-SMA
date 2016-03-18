@@ -51,6 +51,7 @@ my_data <- lapop.2014.SLV[,c('fear10','vic1ext','vic1exta',
 my_data$vic1exta[my_data$vic1exta > 800000] <- 0
 my_data$a4 <- as.numeric(lapop.2014.SLV$a4 %in% c(5,14,27,30,57))
 is.na(my_data[my_data>800000]) <- TRUE
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 
 my_complete <- na.omit(my_data)
 pr_complete <- prcomp(my_complete, center = TRUE, scale = FALSE)
