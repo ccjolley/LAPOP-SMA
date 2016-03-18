@@ -30,7 +30,6 @@ library(ggplot2)
 library(mice)
 library(plyr) 
 library(GGally) 
-set.seed(12345) 
 
 setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
 lapop.2014.GTM <- read.csv('../../2014-GTM.csv')
