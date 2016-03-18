@@ -46,6 +46,11 @@ make_idx <- function(data,vars,sgn=1,scale=FALSE,seed=12345) {
   my_pr <- lapply(1:5,function(x) 
     prcomp(complete(my_imp,x),scale=scale,center=TRUE))
   all_pc1 <- data.frame(llply(1:5, function(i) my_pr[[i]]$x[,1]))
+  for (i in 2:ncol(all_pc1)) {  # This isn't quite right yet.
+    if (cor(all_pc1[,1],all_pc1[,2]) < 0) {
+      all_pc1[,2] <- -1 * all_pc1[,2]
+    }
+  }
   avg <- rowMeans(all_pc1)
   scale(sgn*avg)
 }
