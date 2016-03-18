@@ -17,7 +17,6 @@ library(ggplot2)
 library(mice)
 library(plyr) 
 library(GGally) 
-set.seed(12345) 
 ```
 
 ```{r}
@@ -28,6 +27,7 @@ lapop.2014.HND <- read.csv('../../2014-HND.csv')
 v <- c('cp5','cp7','cp8','cp13','cp20')
 my_data <- rbind(lapop.2014.GTM[,v],lapop.2014.SLV[,v],lapop.2014.HND[,v])
 is.na(my_data[my_data>16]) <- TRUE
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 ```
 
 We'll use multiple imputation to fill in missing data, but let's omit missing values first to be sure that everything makes sense.
@@ -41,8 +41,19 @@ summary(pr_complete)
 Without any imputation, 38.4% of variance is concentrated on the first principal component.
 
 ```{r}
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data,printFlag = F,seed=12345) 
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
 
 None of the variables stand out as needing too much imputation, with the CLEAR exception of `cp20`, which was question conditioned on the subject being female. Presumably, what the imputation is telling us is that the individual in question is the kind of guy who would go to women's groups if men were invited.
@@ -69,7 +80,7 @@ names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
 
-Our different imputed datasets correlate strongly, and the distribution skews toward high values of PC1.
+Our different imputed datasets correlate strongly, and the distribution skews toward low values of PC1.
 
 ```{r, fig.height=5, fig.width=10}
 all_pc1$avg <- rowMeans(all_pc1)
@@ -84,7 +95,7 @@ ggplot(data=qchange) +
   geom_segment(aes(x=0,y=qchange$low,xend=1,yend=qchange$hi,
                    color=qchange$slope),size=1) +
   scale_color_gradient(low='#FF420E',high='#89DA59') +
-  geom_text(aes(x=1,y=qchange$low,label=qchange$label,
+  geom_text(aes(x=1,y=qchange$hi,label=qchange$label,
                 hjust=0,color=qchange$slope),size=5) +
   annotate("text",x=0,y=0,label='Average in lowest quartile',hjust=0) +
   annotate("text",x=1,y=0,label='Average in highest quartile',hjust=1) +
@@ -98,16 +109,16 @@ ggplot(data=qchange) +
         text=element_text(size=20))
 ```
 
-All five variables increase as the index increases; recall that larger values correspond to less-frequent participation, so our index is pointing in the wrong direction. Because `cp7` (parent's association attendance) has the steepest slope, we suspect that it will have the strongest influence on the composite index.
+All five variables decrease as the index increases; recall that larger values correspond to less-frequent participation, so our index is pointing in the right direction. Because `cp7` (parent's association attendance) has the steepest slope, we suspect that it will have the strongest influence on the composite index.
 
 ```{r}
-all_pc1$norm <- -scale(all_pc1$avg) 
+all_pc1$norm <- scale(all_pc1$avg) 
 predict_data <- data.frame(cp5=c(4,1),cp7=c(4,1),cp8=c(4,1),
                            cp13=c(4,1),cp20=c(4,1))
 # The first row is the responses that would come from the least-engaged person
 # possible; the second row is the responses from a maximally-engaged person.
 minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
-minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) 
+minmax <- (minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) 
 # Comparing minmax to quantile(all_pc1$norm), we can see that some people are
 # pretty close to the minimum level of engagement, and no one is near the 
 # maximum.
@@ -115,7 +126,7 @@ minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg)
 predict_data2 <- data.frame(4-diag(5))
 names(predict_data2) <- names(my_data)
 scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
-scores <- -(scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
 diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
 ggplot(diff,aes(x=n,y=d)) +
   geom_bar(stat='identity',fill='skyblue') +
@@ -192,5 +203,9 @@ ggplot(cp20,aes(x=w,y=q)) +
   theme(text=element_text(size=20)) 
 ```
 
-Before, moving with the other two countries, let us drop `honcp22`and `honcp21a`from the index, since they are exclusive to the studies done in Honduras. Without them, we still have an index for all three countries in the Northern Triangle.
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
+```
 

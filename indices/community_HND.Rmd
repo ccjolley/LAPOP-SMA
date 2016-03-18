@@ -7,12 +7,12 @@ output: html_document
 The following is a proposed index, measuring the level of civic and political participation, and civil socity involvement of the individuals interrogated. Variables such as 'Attendance to religious meetings' and 'Sports Activities' were excluded, due to them not directly falling into the categories previously listed. In all, do individuals participate in making their community's social and political environment better? If so, how often?
 
 * `cp5`: Tried to solve a community problem (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
-* `cp7`: Attended meetings of Parent Association (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
-* `cp8`: Attended meetings of Community Improvement Association (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
-* `cp13`: Attended meetings of a Political Party (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
-* `cp20`: Attended meetings of Women's Group (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
-* `honcp22`: Help for security groups (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
-* `honcp21a`: Help for neighborhood associations (1=Once a week, 2=Once or twice a month, 3=Once or twice a year, 4=Never)
+* `cp7`: Attended meetings of Parent Association 
+* `cp8`: Attended meetings of Community Improvement Association 
+* `cp13`: Attended meetings of a Political Party 
+* `cp20`: Attended meetings of Women's Group 
+* `honcp22`: Help for security groups 
+* `honcp21a`: Help for neighborhood associations 
 
 The two latter elements are particular to Honduras, and are not present for the data on El Salvador and Guatemala. 
 
@@ -21,18 +21,13 @@ library(ggplot2)
 library(mice)
 library(plyr) # nice for re-formatting data
 library(GGally) # for plot matrices
-set.seed(12345) # makes imputation reproducible
-```
 
-```{r}
 setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/indices")
 lapop.2014.HND <- read.csv("../../HND-2014.csv")
 my_data <- lapop.2014.HND[,c('cp5','cp7','cp8','cp13','cp20','honcp22','honcp21a')]
-```
-
-```{r}
 is.na(my_data[my_data>16]) <- TRUE
 nrow(na.omit(my_data))
+my_data <- my_data[,order(names(my_data))] # alphabetize columns
 ```
 Ignoring missing values, we are looking at 762 rows left
 
@@ -50,10 +45,22 @@ summary(pr_complete)
 Without any imputation, 32.7% of variance is concentrated on the first principal component.
 
 ```{r}
-my_imp <- mice(my_data,printFlag = F) 
-my_imp
+my_imp <- mice(my_data,printFlag = F,seed=12345) 
+nmis <- my_imp$nmis
+nm <- data.frame(nmis=nmis/nrow(my_data),var=names(nmis))
+ggplot(nm,aes(x=var,y=nmis)) +
+  geom_bar(stat = 'identity', fill = '#90AFC5') +
+  ylab('Fraction of imputed values') +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.title.y=element_blank(),
+        text=element_text(size=20))
 ```
-None of the variables stand out as needing too much imputation, with the CLEAR exception of `cp20`, which was question conditioned on the subject being female. Presumably, what the imputation is telling us is that the individual in question is the kind of guy who would go to women's groups if men were invited.
+
+None of the variables stand out as needing too much imputation, with the CLEAR exception of `cp20`, which was question conditioned on the subject being female. Presumably, what the imputation is telling us is whether the individual in question is the kind of guy who would go to women's groups if men were invited.
 
 ```{r}
 pr <- lapply(1:5,function(x) prcomp(complete(my_imp,x),scale=FALSE,center=TRUE))
@@ -65,7 +72,7 @@ With the imputation, we don't have much change. 32.5% of variance is concentrate
 ```{r}
 pc1 <- pr[[1]]$x[,1]
 pc2 <- pr[[1]]$x[,2]
-qplot(pc1,pc2)
+qplot(pc1,pc2) + theme_classic()
 ```
 
 ```{r}
@@ -74,43 +81,55 @@ names(all_pc1) <- c('imp1','imp2','imp3','imp4','imp5')
 ggpairs(all_pc1) + theme_classic()
 ```
 
-And yes! We have some great correlations. This may get imputed with rather high confidence, given that most people don't attend these meetings much or at all - this also is common among the most engaged, whose presence is not as frequent in these kind of meetings!
+We have a problem here; some of our imputed datasets differ from each other by a sign change. We'll have to flip these so that all have a high correlation with `imp1`, rather than an anticorrelation.
 
 ```{r}
-all_pc1$avg <- rowMeans(all_pc1)
-quantile(all_pc1$avg)
-colMeans(my_data[all_pc1$avg <= quantile(all_pc1$avg)[2],],na.rm=TRUE)
-colMeans(my_data[all_pc1$avg >= quantile(all_pc1$avg)[4],],na.rm=TRUE)
+for (i in 2:ncol(all_pc1)) {
+  if (cor(all_pc1[,1],all_pc1[,2]) < 0) {
+    all_pc1[,2] <- -1 * all_pc1[,2]
+  }
+}
+ggpairs(all_pc1) + theme_classic()
 ```
-When comparing the lower 25% quartile to the higher 75% quartile, all of the variables show that the subjects are not often engaged in these kinds of activities; in some cases, they are never present.
 
-* Some initiative in trying to solve a community problem `cp5`; however, judging by the number of people that are never present, I am assuming that these meetings have some exclusivity. Not surprising!
-* The case above is also applicable to:
-* `cp7`: Meetings to Parent Association
-* `cp8`: Meetings to Community Improvement Association
-* `honcp21a`: Help for neighborhood associations.
+Much better.
 
-In the instance that there is a:
+```{r,fig.height=5,fig.width=10}
+all_pc1$avg <- rowMeans(all_pc1)
+qchange <- data.frame(low=colMeans(my_data[all_pc1$avg < quantile(all_pc1$avg)[2],],na.rm=TRUE),
+                      hi=colMeans(my_data[all_pc1$avg > quantile(all_pc1$avg)[4],],na.rm=TRUE))
+qchange$slope <- qchange$hi - qchange$low
+qchange$label <- rownames(qchange)
+qchange$even <- rank(qchange$hi)/nrow(qchange)*max(qchange$hi)
+ggplot(data=qchange) +
+  geom_segment(aes(x=0,y=qchange$low,xend=1,yend=qchange$hi,
+                   color=qchange$slope),size=1) +
+  scale_color_gradient(low='#FF420E',high='#89DA59') +
+  geom_text(aes(x=1,y=(qchange$even+qchange$hi)/2,label=qchange$label,
+                hjust=0,color=qchange$slope),size=5) +
+  annotate("text",x=0,y=0,label='Average in lowest quartile',hjust=0) +
+  annotate("text",x=1,y=0,label='Average in highest quartile',hjust=1) +
+  scale_x_continuous(limits=c(0,1.5)) +
+  theme_classic() +
+  theme(legend.position='none',
+        axis.ticks=element_blank(),
+        axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.title=element_blank(),
+        text=element_text(size=20))
+```
 
-* Meetings of a Political Party (`b13`)
-* Meeting of a Women's Group (`b20`)
-* Help for Security Groups (`honcp22`)
-
-The participation is slim to none.
-
-Note that high values of the index correspond to larger numbers, which means *less* frequent engagement. Let's reverse the index so that everything is pointing in the right direction. 
-
-It would be interesting to look more into the profile of the people that do engage in these activities - particularly, the men who imputed values of 1 or 2 in women's groups meetings.
+In the lowest quartile, nearly everyone answered '4', indicating no participation at all. Among the most engaged quartile, parents' groups (`cp7`) appear to be the most popular community activity. Our index appears to be pointing in the right direction.
 
 ```{r}
-all_pc1$norm <- -scale(all_pc1$avg) 
+all_pc1$norm <- scale(all_pc1$avg) 
 predict_data <- data.frame(cp5=c(4,1),cp7=c(4,1),cp8=c(4,1),
                            cp13=c(4,1),cp20=c(4,1),honcp22=c(4,1),
                            honcp21a=c(4,1))
 # The first row is the responses that would come from the least-engaged person
 # possible; the second row is the responses from a maximally-engaged person.
 minmax <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data)[,1]))
-minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) 
+minmax <- (minmax - mean(all_pc1$avg)) / sd(all_pc1$avg) 
 # Comparing minmax to quantile(all_pc1$norm), we can see that some people are
 # pretty close to the minimum level of engagement, and no one is near the 
 # maximum.
@@ -118,7 +137,7 @@ minmax <- -(minmax - mean(all_pc1$avg)) / sd(all_pc1$avg)
 predict_data2 <- data.frame(4-diag(7))
 names(predict_data2) <- names(my_data)
 scores <- rowMeans(sapply(1:5, function(i) predict(pr[[i]],predict_data2)[,1]))
-scores <- -(scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
+scores <- (scores-mean(all_pc1$avg)) / sd(all_pc1$avg) 
 diff <- data.frame(d=(scores - minmax[1]),n=names(predict_data))
 ggplot(diff,aes(x=n,y=d)) +
   geom_bar(stat='identity',fill='skyblue') +
@@ -193,3 +212,8 @@ ggplot(cp20,aes(x=w,y=q)) +
   theme(text=element_text(size=20)) 
 ```
 
+Finally, check these values against the comments in `make_indices.R` to be sure we're calculating the same index:
+
+```{r}
+quantile(all_pc1$norm)
+```
