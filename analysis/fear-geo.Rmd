@@ -9,8 +9,9 @@ Build all of the composite indices and generate geolocations.
 
 
 ```{r,message=FALSE}
-source('make_indices.R')
-source('make_geo.R')
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/analysis")
+source('../indices/make_indices.R')
+source('../utils/make_geo.R')
 library(plyr)
 library(XLConnect)
 
