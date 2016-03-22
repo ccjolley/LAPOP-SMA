@@ -7,9 +7,9 @@ output: html_document
 
 Rather than re-calculating all of the indices here, we've got the code to do this stashed in a separate R file.
 
-``` {r}
-setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
-source('make_indices.R')
+``` {r,message=FALSE}
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/analysis")
+source('../indices/make_indices.R')
 library(plyr)
 library(MASS)
 library(stringr)
@@ -18,15 +18,12 @@ library(stringr)
 To systematically explore all possible correlations with our fear index, we first need to see which haven't been accounted for in one of our other composite indices.
 
 ```{r}
-source('classify_vars.R')
+source('../utils/classify_vars.R')
 ```
 
 The appopriate method for finding correlations will be different for each of these three types of variables. I've defined three functions that take the same inputs and produce similar outputs, so that all can be combined and compared at the end.
 
 Note that all of the functions below set the p-value cutoff, by default, to `1/ncol(data)` This is appropriate in cases (like this one) where we're looking at a large number of variables -- if we have more variables then we're more likely to observe spurious correlations so we need to be stricter. 
-
-```{r}
-```
 
 **Region-wide**
 
@@ -50,9 +47,6 @@ Next, we'll use the functions defined above to get all of our correlations. We'l
 While we have a list of which values of unordered categorical variables are significantly correlated with the fear index, the variables aren't formatted in a way that will be useful for multiple regression. We'll do this by creating dummy variables, with the same names as the `var` column in `cor_all`. (For example, `ocup1a_4` for `ocup1a == 4`.)
 
 ```{r}
-# TODO: pass 'fear_idx' in as an argument and move this out into another
-# source file so that I can re-use it elsewhere. Base off of the version in
-# west.R
 cor_data <- function(d,bin_vars,ord_vars,idx_vars,unord_vars) {
   # takes a data frame d with all of the variables that are to be correlated
   # with the fear index, and returns a new data frame with all of the 
@@ -89,9 +83,7 @@ b <- mice(a2,printFlag=F,predictorMatrix=pm)
 
 We can get to a decent set of variables using stepwise regression. What we'll do is run backward stepwise regression on each imputed dataset and keep only the ones that appear for all five sets. One can get pretty much the exact same result using forward regression (I checked).
 
-```{r}
-# TODO: move this out into another file; use something like the version
-# in west.R
+```{r,fig.height=10,fig.width=10}
 get_vars <- function(x) {
   # gets variables that appear consistently in stepwise regression
   # x should be an object returned by MICE
@@ -118,7 +110,7 @@ b_form <- 'fear_idx ~ a4_5 + aoj22_1 + aut_idx + ca_idx + clien1n + d6 + ed2 +
            pole2n + q3c_5 + sd3new2 + tr_idx + ur + vb20_4 + w14a + www1'
 b.reg2 <- with(data=b,exp=lm(as.formula(b_form)))
 
-source('lm_plot.R')
+source('../utils/lm_plot.R')
 replace_text <- data.frame(label=c('it1','ur','tr_idx','ca_idx','aut_idx',
                                    'q3c_5','pole2n','for6','a4_5','ocup4a_3',
                                    'mil10c','pol1','clien1n','aoj22_1'),
@@ -134,10 +126,10 @@ replace_text <- data.frame(label=c('it1','ur','tr_idx','ca_idx','aut_idx',
 label_offsets <- data.frame(label=c('it1','a4_5','for6','clien1n','pol1'),
                             x=c(0,0.7,0.2,0.1,0.3),y=c(0,-0.02,0.02,-0.02,0))
 flip_us <- c('it1','ur','for6','mil10c','pol1','clien1n')
-plotme_all <- lm_plot(b.reg2,a2,'Region-wide',p_max=0.01,text=replace_text,
-                      offsets=label_offsets,flip=flip_us,width=20)
 # tmp <- summary(pool(b.reg2))
 # tmp[order(tmp[,5]),c(1,5)]
+plotme_all <- lm_plot(b.reg2,a2,'Region-wide',p_max=0.01,text=replace_text,
+                      offsets=label_offsets,flip=flip_us,width=20)
 ```
 
 Variable  |Description                                    |Effect
@@ -164,7 +156,7 @@ Variable  |Description                                    |Effect
 `d6`      |Approval of same-sex marriage                  |Approving = more fear 
 `for1n=7` |Most influential country is Mexico             |More fearful
 
-```{r}
+```{r,fig.height=10,fig.width=10}
 my_geo <- lapop.2014.all[,c('pais','municipio')]
 my_geo$muni_uniq <- 10000*my_geo$pais + my_geo$municipio
 my_geo$fear <- fear_all
@@ -174,8 +166,8 @@ my_geo$muni_avg <- muni_avg$x[match(my_geo$muni_uniq,muni_avg$muni_uniq)]
 lm_plot_geo <- function(x,plotme,title) {
   s_geo <- summary(pool(x))
   tmp <- plotme
-  tmp$geo_est <- s_geo[c(-1,-nrow(s_geo)),1]
-  tmp$geo_logp <- -log10(s_geo[c(-1,-nrow(s_geo)),5])
+  tmp$geo_est <- s_geo[row.names(tmp),'est']
+  tmp$geo_logp <- -log10(s_geo[row.names(tmp),'Pr(>|t|)'])
   m <- max(tmp$geo_logp[tmp$geo_logp < Inf])
   tmp$geo_logp[tmp$geo_logp > m] <- 1.1*m
   tmp$geo_est <- tmp$geo_est * tmp$scale
@@ -215,6 +207,8 @@ The following variables lost enough significance when we included municipality-l
 
 In addition, `for6` and `q3c = 12` were previously significant at the p=0.01 level and are now only significant at the p=0.05 level.
 
+I'm not crazy about this plot, because I have serious doubts about whether it's legitimate to be using the municipality-level averages here. Using `estratopri`-level averages might be a better idea. Also, I think the way that I flipped the sign of some variables when making the previous plot is making things cross the zero line in strange ways here (see `it1` and `ur`, for example).
+
 # Guatemala #
 
 Next, let's see if any of the Guatemala-specific variables are interesting. 
@@ -228,8 +222,7 @@ g$tr_idx <- tr_gtm
 g$w_idx <- w_gtm
 g$crit_idx <- crit_all[lapop.2014.all$pais==2]
 g$aut_idx <- aut_all[lapop.2014.all$pais==2]
-g$pv_idx <- pv_gtm
-idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx','pv_idx')
+idxs <- c('fear_idx','ca_idx','tr_idx','w_idx','crit_idx','aut_idx')
 
 g2 <- cor_data(g,c(bin_common,bin_gtm),c(ord_common,ord_gtm),idxs,
                c(unord_common,unord_gtm))
@@ -245,13 +238,13 @@ g_imp <- mice(g2,printFlag=F,predictorMatrix=pm_g)
 
 Let's cut right to the chase and use stepwise regression on our multiply-imputed data:
 
-```{r}
+```{r,fig.height=10,fig.width=10}
 get_vars(g_imp)
 
 g_form <- 'fear_idx ~ a4_27 + a4_5 + aoj21_1 + aoj21_2 + aoj21_7 + aoj21_8 + 
            aut_idx + crit_idx + d6 + dvw1 + for4_1 + guaetid2n_1 + 
            guaetid2n_16 + it1 + leng4_1 + leng4_2 + per9 + pn4 + pole2n + 
-           pr3a + pv_idx + pv3 + q3c_2 + sd3new2 + tr_idx + ur + vb20_4 + 
+           pr3a + pv3 + q3c_2 + sd3new2 + tr_idx + ur + vb20_4 + 
            vic52n + w_idx'
 g.reg <- with(data=g_imp,exp=lm(as.formula(g_form)))
 plotme_g <- lm_plot(g.reg,g2,'Guatemala')
@@ -267,7 +260,6 @@ Variable         |Description                                  |Effect
 `aoj21 = 2`      |Gangs are biggest threat to security         |More fearful
 `leng4 = 1`      |Parents only speak Spanish (not indigenous)  |More fearful
 `it1`            |Interpersonal trust                          |Less trust = more fear
-`pv_idx`         |Political violence index                     |More violence = more fear
 `dvw1`           |Husband can hit wife if she neglects chores  |Less approving = more fear
 `aut_idx`        |Authoritarianism index                       |More authoritarian = more fear
 `a4 = 5`         |Crime the biggest problem                    |More fearful
@@ -299,7 +291,7 @@ We can generalize to a few trends:
 - People who see strong US influence are more fearful, but so are people who see strong Chinese influence. Is this a contradiction?
 - People who consider themselves emotionally stable are actually *more* fearful. What's going on here?
 
-```{r}
+```{r,fig.height=10,fig.width=10}
 my_geo_g <- data.frame(muni=lapop.2014.GTM$municipio,fear=fear_gtm)
 muni_avg_g <- ddply(my_geo_g,~muni,summarize,x=mean(fear))
 my_geo_g$muni_avg <- muni_avg_g$x[match(my_geo_g$muni,muni_avg_g$muni)]
@@ -332,12 +324,12 @@ s_imp <- mice(s2,printFlag=F,predictorMatrix=pm_s)
 
 Let's cut right to the chase and use stepwise regression on our multiply-imputed data:
 
-```{r}
+```{r,fig.height=10,fig.width=10}
 get_vars(s_imp)
 
 s_form <- 'fear_idx ~ aut_idx + ca_idx + clien1n + cpss1 + ed + ed2 + 
            elsvb48_11 + elsvb55a + elsvb55c + elsvb55g + env1_2 + for5_10 + 
-           info1 + infra2 + it1 + np1 + pn4 + pol1 + pole2n + pr1_3 + q11n_6 +
+           info1 + infra2 + it1 + np1 + pol1 + pole2n + pr1_3 + q11n_6 +
            q3c_5 + sd6new2 + sexi + tr_idx + ur'
 s.reg <- with(data=s_imp,exp=lm(as.formula(s_form)))
 plotme_s <- lm_plot(s.reg,s2,'El Salvador')
@@ -367,7 +359,7 @@ Variable         |Description                                     |Effect
 `elsvb55g`       |Uses friends/relatives as info source for voting|Yes = more fearful
 `cpss1`          |Played a sport                                  |Yes = more fearful
 
-```{r}
+```{r,fig.height=10,fig.width=10}
 my_geo_s <- data.frame(muni=lapop.2014.SLV$municipio,fear=fear_slv)
 muni_avg_s <- ddply(my_geo_s,~muni,summarize,x=mean(fear))
 my_geo_s$muni_avg <- muni_avg_s$x[match(my_geo_s$muni,muni_avg_s$muni)]
@@ -380,7 +372,7 @@ lm_plot_geo(s.reggeo,plotme_s,"El Salvador")
 
 **Honduras**
 
-```{r}
+```{r,fig.height=10,fig.width=10}
 h <- lapop.2014.HND[,c(unused_common,unused_hnd)]
 is.na(h[h>800000]) <- TRUE
 h$fear_idx <- fear_hnd
@@ -418,7 +410,6 @@ replace_text <- data.frame(label=c('it1','ur','tr_idx','aut_idx',
                                   'Receipt from neighborhood stores',
                                   'Dissatisfaction with public schools'),
                            stringsAsFactors=FALSE)
-# TODO: Set these offsets when I'm working with the big monitor.
 label_offsets <- data.frame(label=c('pr3e','coer1','tr_idx'),
                             x=c(0,0.35,0.1),y=c(0.02,0,0))
 flip_us <- c('it1','ur','mil10c','ico2','coer1')
@@ -446,7 +437,7 @@ Variable         |Description                                     |Effect
 `b20`            |Trust in Catholic Church                        |Less trust = more fear
 `q14`            |Intends to live or work abroad                  |Yes = more fear
 
-```{r}
+```{r,fig.height=10,fig.width=10}
 my_geo_h <- data.frame(muni=lapop.2014.HND$municipio,fear=fear_hnd)
 muni_avg_h <- ddply(my_geo_h,~muni,summarize,x=mean(fear))
 my_geo_h$muni_avg <- muni_avg_h$x[match(my_geo_h$muni,muni_avg_h$muni)]
@@ -456,5 +447,4 @@ h.reggeo <- with(data=h_imp,exp=lm(as.formula(h_form_geo)))
 lm_plot_geo(h.reggeo,plotme_h,"Honduras")
 ```
 
-
-TODO: Check all 3 of my fear_XXX.Rmd files; make sure that the max and min values of the fear indices are *exactly* the same as what I see here, so that I'm comparing apples to apples.
+This is horrible -- switching the signs for better interpretability of the other plot has made this one do some really strange things.
