@@ -1,40 +1,65 @@
-# Compile some statistics on bribes 
+---
+title: "Bribes"
+author: "Craig Jolley"
+date: "February 3, 2015"
+output: html_document
+---
 
+Putting together some statistics on bribery, based on the LAPOP data.
+
+```{r}
 library(plyr)
+library(reshape2)
+library(ggplot2)
 
-setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
-lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
-lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
-lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/viz")
+lapop.2014.HND <- read.csv("../../HND-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.GTM <- read.csv("../../GTM-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.SLV <- read.csv("../../SLV-2014.csv",stringsAsFactors=FALSE)
 common <- Reduce(intersect,list(names(lapop.2014.GTM),names(lapop.2014.SLV),
                                 names(lapop.2014.HND)))
 lapop.2014.all <- rbind(lapop.2014.GTM[,common],lapop.2014.SLV[,common],
                         lapop.2014.HND[,common])
-
 bribe_vars <- c('exc2','exc6','exc20','exc11','exc13','exc14','exc15','exc16')
 bribe_text <- c('Police','Gov. employee','Soldier','Muni. document processing',
                 'At work','Courts','Health Services','School')
-
 bribe_data <- lapop.2014.all[,c('pais',bribe_vars)]
 bribe_data[bribe_data > 800000] <- NA
-
 avg <- ddply(bribe_data,'pais',function(x) colMeans(x,na.rm=TRUE))
 pais_text <- c('','Guatemala','El Salvador','Honduras')
 avg$pais <- pais_text[avg$pais]
+avg_m <- melt(avg,id='pais')
+names(avg_m) <- c('pais','variable','mean')
 
 low <- ddply(bribe_data,'pais',function(x)
   apply(x[,-1],2,function(x) t.test(x)$conf.int[1]))
+low[low<0] <- 0
+low$pais <- pais_text[low$pais]
+low_m <- melt(low,id='pais')
+names(low_m) <- c('pais','variable','low')
+
 
 high <- ddply(bribe_data,'pais',function(x)
   apply(x[,-1],2,function(x) t.test(x)$conf.int[2]))
+high$pais <- pais_text[high$pais]
+high_m <- melt(high,id='pais')
+names(high_m) <- c('pais','variable','high')
 
-exc18.hnd <- lapop.2014.HND$exc18
-exc18.hnd[exc18.hnd > 800000] <- NA
-mean(exc18.hnd,na.rm=TRUE)
+j <- join(avg_m,low_m,by=c('pais','variable'))
+j2 <- join(j,high_m,by=c('pais','variable'))
+d <- data.frame(variable=bribe_vars,text=bribe_text)
+j3 <- join(j2,d,by='variable')
+d2 <- j3[j3$pais=='Honduras',c('pais','mean','text')]
+d2 <- d2[order(d2$mean),]
+j3$text <- factor(j3$text,d2$text)
 
-exc18.slv <- lapop.2014.SLV$exc18
-exc18.slv[exc18.slv > 800000] <- NA
-mean(exc18.slv,na.rm=TRUE)
-
-colMeans(!is.na(bribe_data))
-colSums(bribe_data,na.rm=TRUE)
+ggplot(j3,aes(x=text,y=mean,ymin=low,ymax=high)) +
+  geom_bar(stat='identity',aes(fill=pais),position='dodge') +
+  geom_errorbar(aes(group=pais),position='dodge') +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=20),
+      axis.title.y=element_blank(),
+      axis.title.x=element_blank(),
+      axis.ticks.x=element_blank()) 
+```
