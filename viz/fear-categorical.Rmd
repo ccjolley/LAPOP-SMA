@@ -4,15 +4,16 @@ author: "Craig Jolley"
 date: "November 19, 2015"
 output: html_document
 ---
-```{r}
+```{r,message=FALSE}
 library(ggplot2)
 library(mice)
 library(plyr)
 library(GGally)
 
-lapop.2014.HND <- read.csv("../2014-HND.csv")
-lapop.2014.SLV <- read.csv("../2014-SLV.csv")
-lapop.2014.GTM <- read.csv("../2014-GTM.csv")
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/viz")
+lapop.2014.HND <- read.csv("../../2014-HND.csv")
+lapop.2014.SLV <- read.csv("../../2014-SLV.csv")
+lapop.2014.GTM <- read.csv("../../2014-GTM.csv")
 set.seed(12345) # for reproducibility
 
 incl <- c('vic44','fear10','vic1ext',
