@@ -1,5 +1,5 @@
 ---
-title: "LAPOP"
+title: "LAPOP Summary"
 author: "Craig Jolley"
 date: "January 20, 2016"
 output: html_document
@@ -7,19 +7,19 @@ output: html_document
 
 Calculating some high-level summary points for the LAPOP datasets.
 
-```{r}
+```{r,message=FALSE}
 library(plyr)
 library(ggplot2)
 library(lubridate)
 library(VennDiagram)
 library(RColorBrewer)
-source('make_trends.R')
+source('../utils/make_trends.R')
 
 # Load data
-setwd("C:/Users/Craig/Dropbox/SMA/VSFS/LAPOP-SMA")
-lapop.2014.HND <- read.csv("../HND-2014.csv",stringsAsFactors=FALSE)
-lapop.2014.GTM <- read.csv("../GTM-2014.csv",stringsAsFactors=FALSE)
-lapop.2014.SLV <- read.csv("../SLV-2014.csv",stringsAsFactors=FALSE)
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/viz")
+lapop.2014.HND <- read.csv("../../HND-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.GTM <- read.csv("../../GTM-2014.csv",stringsAsFactors=FALSE)
+lapop.2014.SLV <- read.csv("../../SLV-2014.csv",stringsAsFactors=FALSE)
 # Get useful non-numeric variables
 date_time <- rbind(lapop.2014.GTM[,c('pais','fecha','ti')],
                    lapop.2014.SLV[,c('pais','fecha','ti')],
@@ -60,7 +60,7 @@ lapop.2014.all <- rbind(lapop.2014.GTM[,common],lapop.2014.SLV[,common],
 
 # Basic features #
 
-```{r}
+```{r,message=FALSE,warning=FALSE}
 basic <- data.frame(country=c('Guatemala','El Salvador','Honduras'),
                     nq=c(ncol(lapop.2014.GTM),ncol(lapop.2014.SLV),
                          ncol(lapop.2014.HND)),
@@ -132,18 +132,6 @@ ggplot(ts, aes(fill=category, ymax=ymax, ymin=ymin, xmax=4, xmin=2)) +
            axis.text=element_blank(),
            axis.line=element_blank(),
            axis.title=element_blank())
-
-
-p2 = ggplot(dat, aes(fill=category, ymax=ymax, ymin=ymin, xmax=4, xmin=3)) +
-     geom_rect(colour="grey30") +
-     coord_polar(theta="y") +
-     xlim(c(0, 4)) +
-     theme_bw() +
-     theme(panel.grid=element_blank()) +
-     theme(axis.text=element_blank()) +
-     theme(axis.ticks=element_blank()) +
-     labs(title="Customized ring plot")
-
 ```
 
 # Missing values #
