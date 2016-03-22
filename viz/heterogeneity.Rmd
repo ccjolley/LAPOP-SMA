@@ -1,16 +1,22 @@
-# Explore spatial heterogeneity
+---
+title: "Heterogeneity"
+author: "Craig Jolley"
+date: "January 21, 2016"
+output: html_document
+---
 
+I want to explore spatial heterogeneity -- are there some variables that show more strongly place-based variation than others? Note that this analysis is using spatial information at the municipal level; in most cases, the LAPOP survey isn't designed to give representative results at this level of spatial disaggregation. 
+
+I'm not entirely sure whether there's a way of doing this type of analysis that's more statistically rigorous -- aggregating at the `estratopri` level doesn't explain nearly as much of the variance as the municipal-level aggregation does, but might give similar results.
+
+```{r,message=FALSE}
 library(ggplot2)
 library(plyr)
 library(ggmap)
 
-source('make_geo.R',encoding='utf-8')
-source('make_indices.R')
-
-###############################################################################
-# Lat/long info for Honduras won't be quite right -- my_geo contains aldeas
-# locations, and I want municipalities.
-###############################################################################
+setwd("C:/Users/Craig/Desktop/SMA/VSFS/LAPOP-SMA/viz")
+source('../utils/make_geo.R',encoding='utf-8')
+source('../indices/make_indices.R')
 
 tmp <- my_geo
 tmp$locstr <- paste(tmp$muni_text,tmp$prov_text,tmp$pais_text,
@@ -22,11 +28,11 @@ names(latlong) <- c('long2','lat2','locstr')
 j <- join(tmp,latlong,by="locstr")
 my_geo[my_geo$pais_text=='Honduras','lat'] <- j[j$pais_text=='Honduras','lat2']
 my_geo[my_geo$pais_text=='Honduras','long'] <- j[j$pais_text=='Honduras','long2']
+```
 
-###############################################################################
-# For any variable, calculate the fraction of its variance that can be 
-# attributed to geography at the municipal level.
-###############################################################################
+For any variable, I need to be able to calculate the fraction of its variance that can be attributed to geography at the municipal level. The remainder of its variance can then be attributed to factors within a single municipality.
+
+```{r}
 geo_variance <- function(data,x,make_plot=FALSE,xlab='Value') {
   tmp <- my_geo
   tmp$muni_uniq <- paste(tmp$pais_text,tmp$muni_text,sep='_')  
@@ -51,14 +57,23 @@ geo_variance <- function(data,x,make_plot=FALSE,xlab='Value') {
   }
   summary(my_lm)$r.squared
 }
+```
 
+Our fear index shows a relatively high level of spatial variance (22%):
+
+```{r}
 geo_variance(lapop.2014.all,fear_all,make_plot=T,xlab="Fear index")
+```
+
+Other variables, such as approval for gay marriage, show much less spatial variance (5%). In other words, whether Central Americans approve of gay marriage doesn't correlate strongly with whether other people surveyed in the same municipality also approve.
+
+```{r}
 geo_variance(lapop.2014.all,lapop.2014.all$d6,make_plot=T,xlab="Approval for gay marriage")
+```
 
-###############################################################################
-# Calculate geo_variance for all region-wide variables and plot density
-###############################################################################
+To get a more global view, we can calculate this geo-variance for all of the region-wide variables and see which show unusually high or low variance.
 
+```{r}
 # Ignore these irrelevant variables 
 drop <- c("formatq","sexi","colori","uniq_id","pais","idnum","estratopri",
           "estratosec","upm","prov","municipio","cluster","tamano","idiomaq",
@@ -96,11 +111,11 @@ ggplot(data=geo_var,aes(x=V1)) +
         axis.line=element_blank(),
         axis.title.y=element_blank(),
         text=element_text(size=20))
+```
 
-###############################################################################
-# For a given variable, get a list of locations for which its value is
-# significantly different from the average
-###############################################################################
+For a given variable, we may want a list of locations for which its value is significantly different from the average
+
+``` {r}
 sig_locs <- function(data,var,direction,cutoff=0.01) {
   # direction should be 'two.sided', 'less', or 'greater'
   tmp <- my_geo
@@ -117,50 +132,18 @@ sig_locs <- function(data,var,direction,cutoff=0.01) {
                                   pval=tt$p.value))
     }
   }
-  j <- join(res,tmp[,c(1,3,5,6,7)],by='muni_uniq',match='first')
+  j <- join(res,tmp[,c('pais_text','muni_text','lat','long','muni_uniq','x')],by='muni_uniq',match='first')
   rownames(j) <- NULL
   j <- j[order(j$pval),]
-  j[,c(4,5,6,7,2,3)]
+  j[,c('pais_text','muni_text','lat','long','est','pval')]
 }
+```
 
-###############################################################################
-# Get these outlier locations for the maps in my presentation
-###############################################################################
-setwd("C:/Users/Craig/Dropbox/SMA/VSFS/Presentation")
-write.csv(sig_locs(d,d$fear_idx,'greater'),
-          'fear-outliers.csv',fileEncoding='utf-8')
-write.csv(sig_locs(d,d$ur,'less'),
-          'urban-outliers.csv',fileEncoding='utf-8')
-write.csv(sig_locs(d,d$it1,'greater'),
-          'it-outliers.csv',fileEncoding='utf-8')
+What does this look like for our fear index?
 
+```{r}
+sl <- sig_locs(d,d$fear_idx,'greater')
+head(sl[,c('pais_text','muni_text','est','pval')])
+```
 
-sig_locs(d,d$d6,'greater') # Just Distrito Central, Honduras
-
-
-write.csv(sig_locs(d,d$aut_idx,'greater'),
-          'aut-outliers.csv',fileEncoding='utf-8')
-
-write.csv(sig_locs(d,d$ed2,'greater'),
-          'ed2-outliers.csv',fileEncoding='utf-8')
-write.csv(sig_locs(d,d$pole2n,'greater'),
-          'pole2n-outliers.csv',fileEncoding='utf-8')
-write.csv(sig_locs(d,d$ca_idx,'greater'),
-          'ca_idx_high.csv',fileEncoding='utf-8')
-write.csv(sig_locs(d,d$ca_idx,'less'),
-          'ca_idx_low.csv',fileEncoding='utf-8')
-
-write.csv(sig_locs(d,d$pol1,'less'),
-          'pol1_high.csv',fileEncoding='utf-8')
-write.csv(sig_locs(d,d$pol1,'greater'),
-          'pol1_low.csv',fileEncoding='utf-8')
-
-geo_variance(d,d$tr_idx)
-
-write.csv(sig_locs(d,d$tr_idx,'less'),
-          'trust_outliers.csv',fileEncoding='utf-8')
-
-write.csv(sig_locs(d,d$q3c_5,'greater'),
-          'evangel_outliers.csv',fileEncoding='utf-8')
-
-sig_locs(d,d$ocup4a_3,'greater') # returns nothing (needs a more graceful error msg)
+Again, we should be careful about interpreting these, because results aren't necessarily representative at the municipal level. I'd be more inclined to trust what we see for big cities than for small ones.
