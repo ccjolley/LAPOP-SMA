@@ -40,10 +40,7 @@ make_idx <- function(data,vars,sgn=1,scale=FALSE,seed=12345) {
   my_data <- data[,vars]
   is.na(my_data[my_data>800000]) <- TRUE
   my_data <- my_data[,order(names(my_data))] # alphabetize columns
-  print(names(my_data))
-  print(sum(my_data,na.rm=TRUE))
   my_imp <- mice(my_data,printFlag=F,seed=seed)
-  print(sum(complete(my_imp,1))) # match
   my_pr <- lapply(1:5,function(x) 
     prcomp(complete(my_imp,x),scale=scale,center=TRUE))
   all_pc1 <- data.frame(llply(1:5, function(i) my_pr[[i]]$x[,1]))
@@ -52,7 +49,6 @@ make_idx <- function(data,vars,sgn=1,scale=FALSE,seed=12345) {
       all_pc1[,i] <- -1 * all_pc1[,i]
     }
   }
-  print(head(all_pc1)) # different
   avg <- rowMeans(all_pc1)
   scale(sgn*avg)
 }
